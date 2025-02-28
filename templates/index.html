@@ -1,0 +1,423 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codify - By Ayushman</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="shortcut icon" href="{{url_for('static',filename='icon.png')}}" type="image/x-icon">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <!-- Add this line to include Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
+    <style>
+        .collapsible-content {
+            display: none;
+            overflow: hidden;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 20px;
+        }
+
+        .collapsible-button {
+            margin-top: 15px;
+            margin-bottom: 8px;
+            align-self: center;
+            cursor: pointer;
+            width: fit-content;
+            border: none;
+            background: linear-gradient(45deg, #6366f1, #10b981);
+            ;
+            padding: 5px 10px;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            border-radius: 10px;
+            color: white;
+        }
+
+        .active,
+        .collapsible-button:hover {
+            background-color: #6365f184;
+        }
+
+        /* Terminal Styles */
+        .terminal-container {
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background-color: #f8f9fa;
+            padding: 5px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .terminal-title {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-dot.running {
+            background-color: green;
+        }
+
+        .status-dot.completed {
+            background-color: blue;
+        }
+
+        .status-dot.error {
+            background-color: red;
+        }
+
+        .status-dot.stopped {
+            background-color: gray;
+        }
+
+        .terminal-controls button {
+            margin-left: 5px;
+        }
+
+        .terminal-output {
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            font-family: monospace;
+            overflow: auto;
+            max-height: 300px;
+            /* Adjust as needed */
+        }
+
+        .terminal-input-container {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #ddd;
+        }
+
+        .terminal-input {
+            flex-grow: 1;
+            padding: 10px;
+            margin-right: 5px;
+        }
+
+        .terminal-line {
+            margin-bottom: 2px;
+        }
+
+        .terminal-line.stdout {
+            color: #00FF00;
+            /* Green for standard output */
+        }
+
+        .terminal-line.stderr {
+            color: #FF0000;
+            /* Red for standard error */
+        }
+
+        .terminal-line.input {
+            color: #FFFF00;
+            /* Yellow for user input */
+        }
+
+        .terminal-line.status {
+            color: #00FFFF;
+        }
+
+        .terminal-controls {
+            display: flex;
+        }
+
+        /* Basic styling for the container */
+        #terminals-container {
+            margin-top: 20px;
+            /* Add some space above the terminals */
+            /* Add any other styling you want for the container */
+        }
+        #super-agent:hover{
+            background-color: #6365f184;
+        }
+
+        .btn-group-sm>.btn,
+        .btn-sm {
+            padding: 2px 4px;
+            font-size: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header" style="display: flex; gap: 10px;">
+                <i class="fas fa-code logo-icon"></i>
+                <h1>CODIFY - AI Agent</h1>
+            </div>
+            <div class="settings-section" style="display: flex; flex-direction: column;">
+                <button class="collapsible-button">Configure API and Model <i class="fa-solid fa-gear"></i></button>
+                <div class="collapsible-content">
+                    <div class="section-title">GEMINI Configuration</div>
+                    <div class="form-group">
+                        <div class="input-with-button">
+                            <input type="password" id="api-key-input" placeholder="Enter your Gemini API key">
+                            <button id="save-api-key-btn" class="primary-btn"><i class="fas fa-check"></i></button>
+                        </div>
+                        <div class="api-key-status" id="api-key-status" style="border-radius: 10px; padding: 0px 30px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="project-selector">
+                <div class="section-title">Project Directory</div>
+                <div class="project-path-container">
+                    <input type="text" id="project-path" placeholder="Enter project path">
+                    <button id="set-path-btn"><i class="fas fa-check"></i></button>
+                </div>
+                <button id="refresh-files-btn" class="secondary-btn">
+                    <i class="fas fa-sync-alt"></i> Refresh Files
+                </button>
+            </div>
+            <div class="file-explorer" >
+                <div class="section-title">Files</div>
+                <div class="search-container">
+                    <input type="text" id="file-search" placeholder="Search files...">
+                </div>
+                <div id="file-list" class="file-list"></div>
+            </div>
+            <div class="project-selector" style="padding-top: 0px;">
+                <p>Active Commands: <span id="active-commands-count">0</span></p>
+                <button id="stop-all-commands-btn" class="primary-btn">Stop All Commands</button>
+                <button id="refresh_command" class="secondary-btn">Refresh</button>
+            </div>
+        </aside>
+
+        <main class="content">
+            <div class="prompt-section">
+                <div class="section-title">What do you want to achieve?</div>
+                <textarea id="user-prompt" placeholder="Describe what you want to do with your project..."></textarea>
+                <div class="action-buttons">
+                    <button id="analyze-btn" class="primary-btn">
+                        <i class="fas fa-brain"></i> Analyze & Suggest Changes
+                    </button>
+                    <button id="run-command-btn" class="secondary-btn">
+                        <i class="fas fa-terminal"></i> Run Command
+                    </button>
+                    <button id="super-agent" class="secondary-btn">
+                        Super Agent
+                    </button>
+                </div>
+                <div id="command-input-container" class="hidden">
+                    <input type="text" id="command-input" placeholder="Enter command to run (e.g., python test.py)">
+                    <button id="execute-command-btn" class="primary-btn">
+                        <i class="fas fa-play"></i> /-
+                    </button>
+                </div>
+            </div>
+            <div id="terminals-container">
+                <!-- Terminals will be added here -->
+            </div>
+
+            <div class="editor-analysis-container" style="width: 100%; height: 100%; display: flex;">
+                <div class="editor-section" style="min-width: 50%; height: 100%;">
+                    <div id="file-tabs" class="file-tabs"></div>
+                    <div class="editor-wrapper" id="editor-container" style="height: 100%;">
+                        <div id="editor-placeholder" class="editor-placeholder">
+                            <i class="fas fa-code fa-3x"></i>
+                            <p>Select a file to edit or analyze your project</p>
+                        </div>
+                        <div id="editor-content" class="hidden" style="height: 80%">
+                            <textarea id="file-editor" style="height: 100%;"></textarea>
+                            <div class="editor-actions">
+                                <button id="save-file-btn" class="secondary-btn">
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div id="analysis-results" class="analysis-results hidden" style="min-width:50%;">
+                    <div class="analysis-header results-header">
+                        <h2>Analysis Results</h2>
+                        <button id="close-analysis-btn" class="icon-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="analysis-content">
+                        <div class="analysis-summary-container">
+                            <h3 class="section-title">Summary</h3>
+                            <div id="analysis-summary" class="analysis-summary"></div>
+                        </div>
+                        <div class="suggested-changes-container">
+                            <h3 class="section-title">Suggested Changes</h3>
+                            <div id="suggested-changes" class="suggested-changes"></div>
+                        </div>
+                        <div class="suggested-commands-container">
+                            <div id="suggested-commands" class="suggested-changes"></div>
+                        </div>
+                        <div class="apply-changes-container">
+                            <button id="apply-all-changes-btn" class="primary-btn">
+                                <i class="fas fa-check-double"></i> Apply All Changes
+                            </button>
+                        </div>
+                        <div id="command-output" class="command-output hidden">
+                            <div class="results-header command-output-header">
+                                <h2>Command Output</h2>
+                                <button id="resolve_command_error" class="secondary-btn">Resolve error</button>
+                                <button id="close-output-btn" class="icon-btn">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <pre id="command-output-text" class="command-output-text"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="toast-container"></div>
+
+
+
+        </main>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <p id="loading-message">Processing your request...</p>
+    </div>
+    <script src="{{ url_for('static', filename='js/terminal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main2.js') }}"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('super-agent').addEventListener('click', function () {
+                document.getElementById('super-agent').classList.toggle('active')
+            })
+            var coll = document.getElementsByClassName("collapsible-button");
+            for (var i = 0; i < coll.length; i++) {
+                coll[i].addEventListener("click", function () {
+                    this.classList.toggle("active");
+                    var content = this.nextElementSibling;
+                    if (content.style.display === "flex") {
+                        content.style.display = "none";
+                    } else {
+                        content.style.display = "flex";
+                    }
+                });
+            }
+        });
+
+
+
+        // Function to call the shutdown endpoint
+        function shutdownServer() {
+            return fetch('/shutdown', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => {
+                    console.log('Shutdown request sent successfully');
+                    return response.json();
+                })
+                .catch(error => {
+                    console.error('Error sending shutdown request:', error);
+                    throw error;
+                });
+        }
+
+        // Variable to track if closing has been confirmed
+        let closingConfirmed = false;
+
+        // Listen for the beforeunload event which fires when the window/tab is about to be closed
+        window.addEventListener('beforeunload', function (event) {
+            // If we've already confirmed, let the tab close naturally
+            if (closingConfirmed) {
+                return;
+            }
+
+            // Prevent the default close and show a confirmation dialog
+            event.preventDefault();
+            event.returnValue = 'Are you sure you want to close? The server will be shut down.';
+
+            // This will show the browser's native confirmation dialog
+            // Note: Modern browsers have standardized the appearance of this dialog
+            // and ignore custom messages for security reasons
+            return event.returnValue;
+        });
+
+        // Create a custom confirmation function that's more reliable than beforeunload
+        function confirmCloseAndShutdown() {
+            if (confirm('Are you sure you want to close the application? The server will be shut down.')) {
+                // Set the flag to true so beforeunload won't trigger again
+                closingConfirmed = true;
+                // Call the shutdown endpoint
+                shutdownServer()
+                    .then(() => {
+                        alert("Server is Not Closed, close it manually!!")
+                        closingConfirmed = False;
+                    })
+                    .catch(() => {
+                        alert("Closed Successfull !!")
+                        closingConfirmed = True;
+                        window.close();
+                    });
+            }
+        }
+
+        // Add a close button to the UI
+        document.addEventListener('DOMContentLoaded', function () {
+            const closeButton = document.createElement('button');
+            closeButton.textContent = 'Close Application';
+            closeButton.style.position = 'fixed';
+            closeButton.style.top = '30px';
+            closeButton.style.right = '48px';
+            closeButton.style.padding = '8px 16px';
+            closeButton.style.backgroundColor = '#f44336';
+            closeButton.style.color = 'white';
+            closeButton.style.border = 'none';
+            closeButton.style.borderRadius = '4px';
+            closeButton.style.cursor = 'pointer';
+            closeButton.style.zIndex = '1000';
+
+            closeButton.addEventListener('click', confirmCloseAndShutdown);
+            document.body.appendChild(closeButton);
+        });
+
+        // Also handle the case when someone closes using keyboard or menu
+        window.addEventListener('keydown', function (event) {
+            // Check for Ctrl+W or Alt+F4 (common shortcut keys to close tabs/windows)
+            if ((event.ctrlKey && event.key === 'w') || (event.altKey && event.key === 'F4')) {
+                event.preventDefault();
+                confirmCloseAndShutdown();
+            }
+        });
+    </script>
+</body>
+
+</html>
