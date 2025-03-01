@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for,Response
 import os
 import threading
 import json
@@ -14,6 +14,8 @@ import subprocess
 import signal
 from threading import Event
 from flask_socketio import SocketIO
+from screen_analyzer import ScreenAnalyzer
+
 
 load_dotenv()
 
@@ -33,15 +35,18 @@ DEFAULT_PROJECT_DIR = os.getenv("DEFAULT_PROJECT_DIR", os.path.join(os.path.expa
 model = None
 active_processes = {}  # Store running processes
 command_stop_events = {}  # Events to signal stopping a command
+analyzer = None
+
 
 def initialize_gemini():
     """Initialize Gemini API with API key from environment variables"""
-    global model
+    global model,analyzer
 
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     if GEMINI_API_KEY:
         try:
             genai.configure(api_key=GEMINI_API_KEY)
+            analyzer = ScreenAnalyzer(GEMINI_API_KEY)
             model = genai.GenerativeModel('gemini-2.0-flash')
             logger.info("Gemini API configured successfully")
         except Exception as e:
@@ -51,10 +56,45 @@ def initialize_gemini():
         logger.warning("No Gemini API key found in environment variables")
         model = None
 
+
+# Define routes
+@app.route('/start_stream', methods=['POST'])
+def start_stream():
+    data = request.get_json()
+    if not data or 'prompt' not in data:
+        return jsonify({'error': 'Missing prompt in request'}), 400
+    if(not analyzer):
+        return jsonify({"message": "No API Key"}), 400
+    success, message = analyzer.start_stream(data['prompt'])
+    status_code = 200 if success else 429 if "wait" in message else 400
+    return jsonify({"status": "success" if success else "error", "message": message}), status_code
+    
+@app.route('/stop_stream', methods=['POST'])
+def stop_stream():
+    success, message = analyzer.stop_stream()
+    return jsonify({"status": "success" if success else "error", "message": message})
+    
+@app.route('/stream')
+def stream():
+    def generate():
+        while analyzer.is_streaming():
+            frame_data = analyzer.get_encoded_frame()
+            if frame_data:
+                yield f"data:image/jpeg;base64,{frame_data}\n\n"
+            time.sleep(analyzer.get_frame_interval())
+            
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+@app.route('/get_gemini_response')
+def get_gemini_response():
+    response_data = {"response": analyzer.get_response()}
+    return jsonify(response_data)
+
+
 @app.route('/api/set-api-key', methods=['POST'])
 def set_api_key():
     """Set the Gemini API key"""
-    global model
+    global model,analyzer
 
     data = request.json
     api_key = data.get('api_key')
@@ -68,7 +108,7 @@ def set_api_key():
     try:
         # Configure Gemini with the new API key
         genai.configure(api_key=api_key)
-
+        analyzer = ScreenAnalyzer(api_key)
         # Test the configuration by creating a model
         test_model = genai.GenerativeModel('gemini-2.0-pro-exp-02-05')
 
@@ -124,12 +164,13 @@ def check_api_key():
 @app.before_request
 def load_api_key():
     """Load API key from session before each request"""
-    global model
+    global model,analyzer
 
     if model is None and 'gemini_api_key' in session:
         api_key = session['gemini_api_key']
         try:
             genai.configure(api_key=api_key)
+            analyzer = ScreenAnalyzer(api_key)
             model = genai.GenerativeModel('gemini-2.0-pro-exp-02-05')
             logger.info("Gemini API configured from session")
         except Exception as e:
@@ -905,11 +946,13 @@ def analyze_project():
     6. Do not introduce or conclude your response just return correct json as below. Always if needed return command to run the file like python app.py
     7. If you are making a web app based on flask. run it using webbrowser python library.(not on port 5000)
     8. Do not the return file in change key if that file do not require modification.(return files that need modifications)
+    9. Do not concider "Exit code: undefined" to be error.
+    10. If vision model summary is given also concider it (when solving error)
 
     Strictly Format your response as valid JSON with these keys:
     {{
         "summary": "Your analysis summary",
-        "need_intervention":"'True' (when code cannot be automatically fixed by AI or need human intervnetion) or 'False' (when code is fixed and returns no error)"
+        "need_intervention":'True' ( When code is running perfectly or when code cannot be automatically fixed by AI or need human intervnetion) or 'False' (when ai can fix errors and human intervention is not needed )
         "commands": [
             {{
                 "command": "terminal command to run",
@@ -1019,7 +1062,7 @@ def create_window():
             width=1200,
             height=800,
             resizable=True,
-            min_size=(800, 600),
+            min_size=(850, 600),
             confirm_close=True
         )
         
@@ -1048,4 +1091,4 @@ if __name__ == "__main__":
     create_window()
 
 
-##final working
+##final working project

@@ -1,4 +1,3 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -14,7 +13,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
-    <!-- Add this line to include Socket.IO -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
     <style>
         .collapsible-content {
@@ -156,7 +154,8 @@
             /* Add some space above the terminals */
             /* Add any other styling you want for the container */
         }
-        #super-agent:hover{
+
+        #super-agent:hover {
             background-color: #6365f184;
         }
 
@@ -199,7 +198,7 @@
                     <i class="fas fa-sync-alt"></i> Refresh Files
                 </button>
             </div>
-            <div class="file-explorer" >
+            <div class="file-explorer">
                 <div class="section-title">Files</div>
                 <div class="search-container">
                     <input type="text" id="file-search" placeholder="Search files...">
@@ -218,15 +217,22 @@
                 <div class="section-title">What do you want to achieve?</div>
                 <textarea id="user-prompt" placeholder="Describe what you want to do with your project..."></textarea>
                 <div class="action-buttons">
-                    <button id="analyze-btn" class="primary-btn">
-                        <i class="fas fa-brain"></i> Analyze & Suggest Changes
-                    </button>
-                    <button id="run-command-btn" class="secondary-btn">
-                        <i class="fas fa-terminal"></i> Run Command
-                    </button>
-                    <button id="super-agent" class="secondary-btn">
-                        Super Agent
-                    </button>
+                    <div class="" style="display: flex; gap: 10px;">
+                        <button id="analyze-btn" class="primary-btn">
+                            <i class="fas fa-brain"></i> Run Codify Analysis
+                        </button>
+                        <button id="super-agent" class="secondary-btn">
+                            Super Agent
+                        </button>
+                        <button id="run-command-btn" class="secondary-btn">
+                            <i class="fas fa-terminal"></i> Run Command
+                        </button>
+                    </div>
+                    <div class="" style="display: flex; gap: 10px; ">
+                        <div id="statusMessage" style="padding: 10px 16px; background-color:#e2e8f068; border-radius: 10px; font-size: 15px;">Stream Status</div>
+                        <button id="startBtn" class="secondary-btn">Stream Screen</button>
+                        <button id="stopBtn" class="secondary-btn">Stop</button>
+                    </div>
                 </div>
                 <div id="command-input-container" class="hidden">
                     <input type="text" id="command-input" placeholder="Enter command to run (e.g., python test.py)">
@@ -270,7 +276,8 @@
                     <div class="analysis-content">
                         <div class="analysis-summary-container">
                             <h3 class="section-title">Summary</h3>
-                            <div id="analysis-summary" class="analysis-summary"></div>
+                            <div id="analysis-summary-stream" class="analysis-summary" style="margin-bottom: 10px;"></div>
+                            <div id="analysis-summary" class="analysis-summary" style="margin-bottom: 10px;"></div>
                         </div>
                         <div class="suggested-changes-container">
                             <h3 class="section-title">Suggested Changes</h3>
@@ -298,9 +305,6 @@
                 </div>
             </div>
             <div class="toast-container"></div>
-
-
-
         </main>
     </div>
 
@@ -418,6 +422,7 @@
             }
         });
     </script>
+    <script src="{{ url_for('static', filename='js/stream.js') }}"></script>
 </body>
 
 </html>

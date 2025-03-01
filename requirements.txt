@@ -4,3 +4,6 @@ eventlet
 python-dotenv
 google-generativeai
 pywebview
+opencv-python 
+mss 
+numpy

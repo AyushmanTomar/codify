@@ -36,8 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         projectPath: '',
         command_output_f: '',
-        intervalID:null,
+        intervalID: null,
         superagent: false,
+        initial_query: "",
         files: [],
         openFiles: {},  // Map of file paths to their contents
         activeFile: null,
@@ -478,13 +479,15 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Please enter a prompt describing what you want to achieve', 'error');
             return;
         }
+        state.initial_query = userPrompt.value.trim();
 
         if (document.getElementById('super-agent').classList.contains('active')) {
             state.superagent = true;
         }
-        else{
+        else {
             state.superagent = false;
         }
+        // console.log(state.superagent);
         // Get files to analyze (either selected files or all open files)
         const filesToAnalyze = Object.keys(state.openFiles);
         try {
@@ -497,19 +500,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     files: [],
                     filenames: state.files
                 });
-                // console.log(data.data);
+                // console.log("app.py return ",data.data);
                 // Display analysis results
                 renderAnalysisResults(data.data);
-                
                 if (state.superagent == true) {
-                    setTimeout(applyAllChanges, 2000);
-                    setTimeout(runAllPendingCommands, 5000);
-                    setTimeout(function() {
-                        if (data.data.need_intervention == 'False' || data.data.need_intervention == false) {
+                    window.initialQuery = state.initial_query; // Make this accessible globally
+                    window.commandOutput = state.command_output_f;
+                    if (isStreaming == false) {
+                        startStream()
+                    }
+                    else {
+                        window.vison_stop_agent == false
+                    }
+                    await applyAllChanges()
+                    await runAllPendingCommands()
+                    setTimeout(function () {
+                        if ((data.data.need_intervention == 'False' || data.data.need_intervention == false) && (window.vison_stop_agent == false || window.vison_stop_agent == 'False')) {
                             resolveerror()
                         }
-                    }, 7000);
+                    }, 5000);
                 }
+                // if (state.superagent == true) {
+                //     window.initialQuery = state.initial_query; // Make this accessible globally
+                //     window.commandOutput = state.command_output_f; 
+                //     startStream()
+                //     setTimeout(applyAllChanges, 2000);
+                //     setTimeout(runAllPendingCommands, 7000);
+                //     setTimeout(function() {
+                //         if ((data.data.need_intervention == 'False' || data.data.need_intervention == false) && ( window.vison_stop_agent == false || window.vison_stop_agent=='False')) {
+                //             resolveerror()
+                //         }
+                //     }, 10000);
+                // }
             }
             else {
                 showLoading('Analyzing project and generating suggestions...');
@@ -522,14 +544,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Display analysis results
                 renderAnalysisResults(data.data);
                 if (state.superagent == true) {
-                    setTimeout(applyAllChanges, 2000);
-                    setTimeout(runAllPendingCommands, 5000);
-                    setTimeout(function() {
-                        if (data.data.need_intervention == 'False' || data.data.need_intervention == false) {
+                    window.initialQuery = state.initial_query; // Make this accessible globally
+                    window.commandOutput = state.command_output_f;
+                    startStream()
+                    await applyAllChanges()
+                    await runAllPendingCommands()
+                    setTimeout(function () {
+                        if ((data.data.need_intervention == 'False' || data.data.need_intervention == false) && (window.vison_stop_agent == false || window.vison_stop_agent == 'False')) {
                             resolveerror()
                         }
-                    }, 7000);
+                    }, 5000);
                 }
+                // if (state.superagent == true) {
+                //     window.initialQuery = state.initial_query; // Make this accessible globally
+                //     window.commandOutput = state.command_output_f; 
+                //     startStream()
+                //     setTimeout(applyAllChanges, 1000);
+                //     setTimeout(runAllPendingCommands, 3000);
+                //     setTimeout(function() {
+                //         if ((data.data.need_intervention == 'False' || data.data.need_intervention == false) && ( window.vison_stop_agent == false || window.vison_stop_agent=='False')) {
+                //             resolveerror()
+                //         }
+                //     }, 10000);
+                // }
             }
         } catch (error) {
             // Error is already logged and shown in apiRequest
@@ -746,9 +783,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.activeFile === filePath) {
                     fileEditor.value = newContent;
                 }
+            } else {
+                openFile(filePath)
             }
 
             showNotification(`Changes applied to ${filePath}`, 'success');
+            refreshFileList()
         } catch (error) {
             // Error is already logged and shown in apiRequest
         } finally {
@@ -811,7 +851,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (state.activeFile === filePath) {
                         fileEditor.value = newContent;
                     }
+                } else {
+                    openFile(filePath)
                 }
+
             }
 
             showNotification(`Applied changes to ${pendingFiles.length} files`, 'success');
@@ -865,7 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Display combined command output
             commandOutputText.textContent = combinedOutput.trim();
-            state.command_output_f=combinedOutput.trim();
+            state.command_output_f = combinedOutput.trim();
 
             // Show output section
             commandOutput.classList.remove('hidden');
@@ -949,11 +992,12 @@ document.addEventListener('DOMContentLoaded', () => {
     saveApiKeyBtn.addEventListener('click', saveApiKey);
     resolve_error.addEventListener('click', resolveerror);
 
-    function resolveerror() {
-        userPrompt.value = "";
-        userPrompt.value = state.command_output_f;
-        analyzeProject();
-
+    async function resolveerror() {
+        userPrompt.value = "desired task:\n" + userPrompt.value + "command output: " + state.command_output_f + "\n vision model output: \n" + window.summary_vision;
+        window.commandOutput = state.command_output_f;
+        if (window.vison_stop_agent == 'False' || window.vison_stop_agent == false) {
+            await analyzeProject();
+        }
     }
 
     // Allow Enter key to submit command
@@ -989,6 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // This would be implemented on the server side
         refreshFileList();
         checkApiKeyStatus();
+        window.vison_stop_agent = 'False'
     }
 
     // Start the app
