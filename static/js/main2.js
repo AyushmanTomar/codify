@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         projectPath: '',
         command_output_f: '',
-        intervalID: null,
         superagent: false,
         initial_query: "",
         files: [],
@@ -510,8 +509,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         startStream()
                     }
                     else {
-                        window.vison_stop_agent == false
+                        window.vison_stop_agent == "False"
                     }
+                    // stopAllCommands()
                     await applyAllChanges()
                     await runAllPendingCommands()
                     setTimeout(function () {
@@ -546,8 +546,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.superagent == true) {
                     window.initialQuery = state.initial_query; // Make this accessible globally
                     window.commandOutput = state.command_output_f;
-                    startStream()
+                    if (isStreaming == false) {
+                        startStream()
+                    }
+                    else {
+                        window.vison_stop_agent == 'False'
+                    }
                     await applyAllChanges()
+                    await comm
                     await runAllPendingCommands()
                     setTimeout(function () {
                         if ((data.data.need_intervention == 'False' || data.data.need_intervention == false) && (window.vison_stop_agent == false || window.vison_stop_agent == 'False')) {
@@ -801,7 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             showLoading(`Running command: ${command}`);
             const data = await apiRequest('run-command', 'POST', { command });
-            state.intervalID = setInterval(listActiveCommands, 5000);
+            window.intervalID = setInterval(listActiveCommands, 5000);
             // Display command output
             commandOutputText.textContent = data.stdout || '';
             if (data.stderr) {

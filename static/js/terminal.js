@@ -1,4 +1,4 @@
-// terminal.js (Revised)
+// terminal.js (Fixed)
 let socket;
 let activeCommands = {};
 
@@ -6,20 +6,28 @@ function initializeSocket() {
     socket = io();
 
     socket.on('command_status', function(data) {
-        const { command_id, status, returncode } = data;
-        console.log("working: ",command_id)
-        console.log(returncode);
+        const { command_id, status, returncode, is_server } = data;
+        console.log("Command status update:", command_id, status);
+        
+        // Create the terminal if it doesn't exist yet
+        if (!document.getElementById(`terminal-${command_id}-container`)) {
+            createTerminal(command_id, `Command: ${command_id}`, is_server);
+        }
+        
         updateCommandStatus(command_id, status, returncode);
     });
 
     socket.on('command_output', function(data) {
         const { command_id, output, type } = data;
-        console.log(output);
-        console.log(command_id)
+        console.log("Command output:", command_id, type);
+        
+        // Create the terminal if it doesn't exist yet
+        if (!document.getElementById(`terminal-${command_id}-container`)) {
+            createTerminal(command_id, `Command: ${command_id}`, true);
+        }
+        
         appendToTerminal(command_id, output, type);
     });
-
-    
 
     socket.on('connect_error', function(error) {
         console.error('Socket.IO connection error:', error);
@@ -36,9 +44,12 @@ function initializeSocket() {
 function createTerminal(command_id, command, is_server) {
     const terminalId = `terminal-${command_id}`;
     if (document.getElementById(terminalId + "-container")) {
+        console.log(`Terminal ${terminalId} already exists`);
         return terminalId;  // Terminal already exists
     }
 
+    console.log(`Creating new terminal: ${terminalId}`);
+    
     const terminalHtml = `
         <div id="${terminalId}-container" class="terminal-container">
             <div class="terminal-header">
@@ -76,6 +87,7 @@ function createTerminal(command_id, command, is_server) {
         attachTerminalEventListeners(command_id);
         activeCommands[command_id] = { command: command, status: 'running', is_server: is_server };
         updateActiveCommandsCounter();
+        console.log(`Terminal ${terminalId} created successfully`);
         return terminalId;
     } else {
         console.error("terminals-container element not found!"); // Crucial error handling
@@ -86,14 +98,32 @@ function createTerminal(command_id, command, is_server) {
 function appendToTerminal(command_id, output, type) {
     const terminalId = `terminal-${command_id}`;
     const terminal = document.getElementById(terminalId);
-    if (terminal) {
+    
+    if (!terminal) {
+        console.warn(`Terminal ${terminalId} not found, attempting to create it`);
+        // Create the terminal if it doesn't exist
+        createTerminal(command_id, `Command: ${command_id}`, true);
+        
+        // Try to get the terminal element again
+        const newTerminal = document.getElementById(terminalId);
+        if (!newTerminal) {
+            console.error(`Failed to create terminal ${terminalId}`);
+            return;
+        }
+        
+        // Append output to the newly created terminal
+        const outputElement = document.createElement('div');
+        outputElement.className = `terminal-line ${type}`;
+        outputElement.textContent = output;
+        newTerminal.appendChild(outputElement);
+        newTerminal.scrollTop = newTerminal.scrollHeight;
+    } else {
+        // Terminal exists, append output normally
         const outputElement = document.createElement('div');
         outputElement.className = `terminal-line ${type}`;
         outputElement.textContent = output;
         terminal.appendChild(outputElement);
         terminal.scrollTop = terminal.scrollHeight;
-    } else {
-        console.warn(`Terminal ${terminalId} not found`);
     }
 }
 
@@ -123,6 +153,8 @@ function updateCommandStatus(command_id, status, returncode) {
                 updateActiveCommandsCounter();
             }
         }
+    } else {
+        console.warn(`Status dot for terminal ${terminalId} not found`);
     }
 }
 
@@ -172,8 +204,6 @@ function attachTerminalEventListeners(command_id) {
     }
 }
 
-
-
 function stopCommand(command_id) {
     fetch('/api/stop-command', {
         method: 'POST',
@@ -186,20 +216,28 @@ function stopCommand(command_id) {
     .then(data => {
         if (data.success) {
             showNotification(`Command stopped: ${command_id}`, 'success');
-            clearInterval(state.intervalID);
-            document.getElementById(`terminal-${command_id}-container`).style.display='none';
+            clearInterval(window.intervalID);
+            const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
+            if (terminalContainer) {
+                terminalContainer.style.display = 'none';
+            }
         } else {
             showNotification(`Error: ${data.message}`, 'error');
-            document.getElementById(`terminal-${command_id}-container`).style.display='none';
+            const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
+            if (terminalContainer) {
+                terminalContainer.style.display = 'none';
+            }
         }
     })
     .catch(error => {
         console.error('Error stopping command:', error);
         showNotification(`Error: ${error.message}`, 'error');
-        document.getElementById(`terminal-${command_id}-container`).style.display='none';
+        const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
+        if (terminalContainer) {
+            terminalContainer.style.display = 'none';
+        }
     });
 }
-
 
 function sendCommandInput(command_id, input) {
     if (!input.trim()) return;
@@ -231,20 +269,23 @@ function listActiveCommands() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Clear existing terminals (optional, depends on desired behavior)
-                // document.getElementById('terminals-container').innerHTML = '';
-
+                console.log("Active commands:", data.commands);
+                
                 data.commands.forEach(command => {
                     // Create terminal *only* if it doesn't exist
                     if (!document.getElementById(`terminal-${command.command_id}-container`)) {
-                         createTerminal(command.command_id, `Process ID: ${command.pid}`, true);
+                        console.log(`Creating terminal for existing command: ${command.command_id}`);
+                        createTerminal(command.command_id, `Process ID: ${command.pid}`, true);
                     }
                     // Update status *even if it exists* (important!)
                     updateCommandStatus(command.command_id, command.status, command.returncode);
                 });
-                 const activeCount = data.commands.filter(cmd => cmd.status === 'running').length;
-                document.getElementById('active-commands-count').textContent = activeCount;
-
+                
+                const activeCount = data.commands.filter(cmd => cmd.status === 'running').length;
+                const countElement = document.getElementById('active-commands-count');
+                if (countElement) {
+                    countElement.textContent = activeCount;
+                }
             } else {
                 console.error("Error listing active commands:", data.message);
             }
@@ -253,7 +294,6 @@ function listActiveCommands() {
             console.error('Error listing active commands:', error);
         });
 }
-
 
 function stopAllCommands() {
     const commandIds = Object.keys(activeCommands).filter(id =>
@@ -274,7 +314,7 @@ function stopAllCommands() {
 function updateActiveCommandsCounter() {
     const activeCount = Object.values(activeCommands)
         .filter(cmd => cmd.status === 'running').length;
-      const counter = document.getElementById('active-commands-count');
+    const counter = document.getElementById('active-commands-count');
     if (counter) {
         counter.textContent = activeCount;
     }
@@ -282,11 +322,11 @@ function updateActiveCommandsCounter() {
 
 function escapeHtml(unsafe) {
     return unsafe
-        .replace(/&/g, "&")
-        .replace(/</g, "<")
-        .replace(/>/g, ">")
-        .replace(/"/g, '"')
-        .replace(/'/g, "'");
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 function showNotification(message, type = 'info') {
@@ -325,8 +365,6 @@ function showNotification(message, type = 'info') {
     }
 }
 
-
-
 document.addEventListener('DOMContentLoaded', function() {
     initializeSocket();
     listActiveCommands(); // Call immediately on load!
@@ -335,8 +373,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (stopAllBtn) {
         stopAllBtn.addEventListener('click', stopAllCommands);
     }
-    document.getElementById("refresh_command").addEventListener('click',function (){
-        listActiveCommands();
-    })
-    // setInterval(listActiveCommands, 5000);
+    
+    const refreshBtn = document.getElementById("refresh_command");
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            listActiveCommands();
+        });
+    }
+    
+    // Periodic refresh of active commands (optional)
+    // const refreshInterval = setInterval(listActiveCommands, 10000);
 });

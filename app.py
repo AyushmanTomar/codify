@@ -371,7 +371,6 @@ def make_non_blocking(pipe):
         
     if os.name == 'nt':  # Windows
         import msvcrt
-        import fcntl
         try:
             msvcrt.setmode(pipe.fileno(), os.O_BINARY)
         except (ImportError, ValueError, OSError) as e:
@@ -543,7 +542,8 @@ def is_server_command(command):
         r'http-server',
         r'web-server',
         r'dev\s+server',
-        r'python\s+.*\.py'  # Any Python script could be a server
+        r'python\s+.*\.py', # Any Python script could be a server
+        r'java',
     ]
 
     for pattern in server_patterns:

@@ -34,6 +34,85 @@ function updateUIState(streaming) {
     // }
 }
 
+
+
+function startStream2() {
+
+
+    // const initialQuery = window.initialQuery || "";
+    // const commandOutput = window.commandOutput || "";
+    
+    const prompt = "give screen analysis";
+    // if (!prompt) {
+    //     statusMessage.textContent = 'Please enter a prompt before starting';
+    //     return;
+    // }
+
+    // Disable UI during request
+    startBtn.disabled = true;
+    // statusMessage.textContent = 'Starting stream...';
+
+    fetch('/start_stream', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Start the stream
+                // streamImage.src = '/stream';
+                updateUIState(true);
+
+                // Start polling for responses
+                responseInterval = setInterval(fetchResponse2, 1000);
+                statusMessage.textContent = data.message;
+                statusMessage.style.color='#10b981'
+            } else {
+                // Handle error
+                statusMessage.textContent = data.message;
+                startBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusMessage.textContent = 'Error starting stream';
+            startBtn.disabled = false;
+        });
+}
+
+
+function fetchResponse2() {
+    if (!isStreaming) return;
+
+    fetch('/get_gemini_response')
+        .then(response => response.json())
+        .then(data => {
+            if (data.response) {
+                // console.log(data)
+                // console.log(data.response)
+                document.getElementById("analysis-results").classList.remove('hidden');
+                document.getElementById("analysis-summary-stream").innerHTML = marked.parse(data.response.summary)
+                // console.log(data.response.summary)
+                // window.vison_stop_agent=data.response.vison_stop_agent
+                window.summary_vision = data.response.summary
+                console.log(data.response.vison_stop_agent)
+                // if(data.response.vison_stop_agent=='True' || data.response.vison_stop_agent==true)
+                // {
+                //     stopStream()
+                // }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching response:', error);
+        });
+}
+
+
+
+
 function startStream() {
 
 
@@ -134,7 +213,7 @@ function fetchResponse() {
 }
 
 // Event listeners
-startBtn.addEventListener('click', startStream);
+startBtn.addEventListener('click', startStream2);
 stopBtn.addEventListener('click', stopStream);
 
 // Handle stream image errors
