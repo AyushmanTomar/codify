@@ -178,11 +178,13 @@ function stopStream() {
             updateUIState(false);
             statusMessage.textContent = data.message;
             statusMessage.style.color='red'
+            setTimeout(speakTextFromDiv(),3000)
         })
         .catch(error => {
             console.error('Error:', error);
             statusMessage.textContent = 'Error stopping stream';
             stopBtn.disabled = false;
+            setTimeout(speakTextFromDiv(),1000)
         });
 }
 
@@ -212,6 +214,45 @@ function fetchResponse() {
         });
 }
 
+function speakTextFromDiv(divId) {
+    // Get the div element
+    const div = document.getElementById("analysis-summary-stream");
+    
+    // Check if div exists
+    if (!div) {
+        console.error(`Div with ID "${divId}" not found`);
+        return;
+    }
+    
+    // Get text from the div
+    const textToSpeak = div.innerText || div.textContent;
+    
+    // Check if there's text to speak
+    if (!textToSpeak || textToSpeak.trim() === '') {
+        console.warn('No text to speak found in the div');
+        return;
+    }
+    
+    // Send the text to the server
+    fetch('/speak', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            message_to_speak: textToSpeak
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        console.log('Text sent for speaking');
+    })
+    .catch(error => {
+        console.error('Error sending text to speak:', error);
+    });
+}
 // Event listeners
 startBtn.addEventListener('click', startStream2);
 stopBtn.addEventListener('click', stopStream);

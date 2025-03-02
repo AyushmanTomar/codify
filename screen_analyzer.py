@@ -1,6 +1,6 @@
 import time
 import base64
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 import re
 import cv2
 import numpy as np
@@ -21,7 +21,7 @@ class ScreenAnalyzer:
         self.frame_interval = 0.033  # ~30 FPS (1/30 = 0.033)
         self.gemini_interval = 1.0   # Fetch Gemini responses every 1 second
         self.cooldown_period = 5.0   # Shorter cooldown
-        self.voice_interval = 1    # More frequent voice feedback
+        self.voice_interval = 1   # More frequent voice feedback
 
         # Initialize state
         self.frame = None
@@ -39,6 +39,7 @@ class ScreenAnalyzer:
         self.last_voice_time = 0
         self.last_spoken_text = ""
         self.voice_thread = None
+        self.voice_stop_event = Event()  # Added an event to signal thread termination
         self.debug_mode = False  # Enable debug mode to print voice info
         
         # Frame processing
@@ -87,6 +88,7 @@ class ScreenAnalyzer:
         # Reset state
         self.streaming = True
         self.stop_flag = False
+        self.voice_stop_event.clear()  # Reset the stop event
         with self.response_lock:
             self.response_text = ""
             
@@ -152,9 +154,29 @@ class ScreenAnalyzer:
         self.stop_flag = True
         self.streaming = False
         self.last_stop_time = time.time()
+        
+        # Signal voice thread to stop and wait for current speech to finish
+        self.voice_stop_event.set()
+        
+        # Add final announcement to queue
         self._add_to_speech_queue("Analysis stopped")
         if self.debug_mode:
             print("Added 'Analysis stopped' to speech queue")
+            
+        # Wait briefly for the final announcement
+        time.sleep(0.2)
+        
+        # Force terminate any active speech
+        try:
+            if self.speaking:
+                if self.debug_mode:
+                    print("Force terminating active speech")
+                # Create a new engine to interrupt the current one
+                interrupt_engine = pyttsx3.init()
+                interrupt_engine.stop()
+        except Exception as e:
+            print(f"Error stopping speech: {e}")
+        
         return True, "Streaming stopped."
 
     def is_streaming(self):
@@ -265,38 +287,71 @@ class ScreenAnalyzer:
 
     def _speak_latest(self):
         """Thread function to speak the latest message in the queue."""
-        while True:
-            if not self.streaming or self.stop_flag:
+        speech_engine = None
+        
+        try:
+            # Initialize speech engine once at start
+            speech_engine = pyttsx3.init()
+            speech_engine.setProperty('rate', 200)  # Faster speech
+            speech_engine.setProperty('volume', 1.0)  # Full volume
+        except Exception as e:
+            print(f"Speech engine initialization error: {e}")
+            
+        while not self.voice_stop_event.is_set():
+            if not self.streaming and not self.speech_queue:
+                # If we're not streaming and there's nothing left to say
                 time.sleep(0.1)
                 continue
+                
             with self.speech_lock:
                 if self.speech_queue and not self.speaking:
                     # Get the latest message (last in queue)
                     latest_message = self.speech_queue[-1]
                     self.speech_queue = []  # Clear queue after grabbing latest
                     self.speaking = True
+                    
             if self.speaking:
                 try:
-                    # Create a new speech engine instance each time
-                    speech_engine = pyttsx3.init()
-                    # Set voice properties - recreated for each instance
-                    speech_engine.setProperty('rate', 200)  # Faster speech
-                    speech_engine.setProperty('volume', 1.0)  # Full volume
+                    # Check again if we should stop before speaking
+                    if self.voice_stop_event.is_set():
+                        break
+                        
+                    # Re-initialize the engine if needed
+                    if speech_engine is None:
+                        speech_engine = pyttsx3.init()
+                        speech_engine.setProperty('rate', 200)
+                        speech_engine.setProperty('volume', 1.0)
                     
                     print(f"Speaking at {time.strftime('%H:%M:%S')}: {latest_message}")
                     speech_engine.say(latest_message)
                     speech_engine.runAndWait()
                 except Exception as e:
                     print(f"Speech error: {e}")
+                    # Try to reinitialize engine on next iteration
+                    speech_engine = None
                 finally:
                     print(f"Finished speaking at {time.strftime('%H:%M:%S')}")
                     with self.speech_lock:
                         self.speaking = False
+                        
+            # Check if stop event is set
+            if self.voice_stop_event.is_set():
+                break
+                
             time.sleep(0.1)  # Small delay to prevent tight looping
+            
+        # Clean up resources
+        try:
+            if speech_engine:
+                speech_engine.stop()
+        except:
+            pass
+            
+        print("Voice thread terminated")
 
     def _add_to_speech_queue(self, text):
         """Add text to speech queue, prioritizing newest information."""
-        if not text:
+        if not text or self.voice_stop_event.is_set():
             return
             
         try:

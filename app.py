@@ -15,7 +15,7 @@ import signal
 from threading import Event
 from flask_socketio import SocketIO
 from screen_analyzer import ScreenAnalyzer
-
+import pyttsx3
 
 load_dotenv()
 
@@ -184,9 +184,81 @@ def index():
     else:
         return redirect(url_for('uniq_key'))
 
+def speak_message(message):
+    """
+    Speaks a message immediately in the background without using the queue system.
+    
+    Args:
+        message (str): The message to be spoken
+    """
+    if not message:
+        return
+        
+    # Create a separate thread for speaking this specific message
+    speak_thread = threading.Thread(target=speak_single_message, args=(message,))
+    speak_thread.daemon = True
+    speak_thread.start()
+
+def speak_single_message(message):
+    """
+    Internal helper method to speak a single message without queue dependencies.
+    
+    Args:
+        message (str): The message to be spoken
+    """
+    try:
+        time.sleep(1)
+        # Create a new speech engine instance for this message
+        speech_engine = pyttsx3.init()
+        # Set voice properties
+        speech_engine.setProperty('rate', 200)  # Faster speech
+        speech_engine.setProperty('volume', 1.0)  # Full volume
+        
+        print(f"Direct speaking at {time.strftime('%H:%M:%S')}: {message}")
+        speech_engine.say(message)
+        speech_engine.runAndWait()
+        print(f"Finished direct speaking at {time.strftime('%H:%M:%S')}")
+        speech_engine.stop()
+    except Exception as e:
+        print(f"Direct speech error: {e}")
+
+
+@app.route('/speak', methods=['POST'])
+def speak():
+    try:
+        data = request.json
+        msg = data.get('message_to_speak')
+        
+        if not msg:
+            return jsonify({
+                'status': 'error',
+                'message': 'No text provided to speak'
+            }), 400
+        
+        # Speak the message
+        speak_message(msg)
+        
+        # Return success response
+        return jsonify({
+            'status': 'success',
+            'message': 'Text is being spoken',
+            'text': msg
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error processing speak request: {str(e)}'
+        }), 500
+
+
+
 @app.route('/key_uniq')
 def uniq_key():
     return render_template('login.html')
+
+
+
 
 @app.route('/set_key_uniq',methods=['POST'])
 def set_uniq_key():
