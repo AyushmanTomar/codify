@@ -16,6 +16,8 @@ from threading import Event
 from flask_socketio import SocketIO
 from screen_analyzer import ScreenAnalyzer
 import pyttsx3
+from datetime import datetime
+import pygit2
 
 load_dotenv()
 
@@ -1085,6 +1087,460 @@ def analyze_project():
         return jsonify({"success": False,
             "message": f"Error analyzing project: {str(e)}"
         }), 500
+
+
+
+
+
+
+@app.route('/gitmain')
+def gitmain():
+    """Home page that shows the Git tree visualization."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    
+    # Check if the project path exists
+    if not os.path.exists(project_path):
+        return render_template('setup.html', error=f"Project path {project_path} does not exist")
+    
+    # Check if git is initialized
+    is_git_initialized = os.path.exists(os.path.join(project_path, '.git'))
+    
+    if not is_git_initialized:
+        return render_template('setup.html', project_path=project_path, git_status="not_initialized")
+    
+    # Get repository info using pygit2
+    try:
+        repo = pygit2.Repository(os.path.join(project_path, '.git'))
+        current_branch = None
+        commits = []
+        status = []
+        
+        # Check if repository has any commits safely
+        try:
+            # Check if the repository is empty
+            if repo.is_empty:
+                current_branch = "No commits yet"
+                has_commits = False
+            else:
+                # Try to get the current branch
+                try:
+                    head_ref = repo.head
+                    # Different versions of pygit2 might handle this differently
+                    if hasattr(head_ref, 'is_detached'):
+                        is_detached = head_ref.is_detached
+                    else:
+                        # Alternative approach for different pygit2 versions
+                        is_detached = head_ref.name == 'HEAD'
+                    
+                    if not is_detached:
+                        current_branch = head_ref.shorthand
+                        has_commits = True
+                    else:
+                        current_branch = "HEAD detached"
+                        has_commits = True
+                except (pygit2.GitError, KeyError, AttributeError):
+                    current_branch = "No commits yet"
+                    has_commits = False
+                
+                # Get commits history only if we have commits
+                if has_commits:
+                    for commit in repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL | pygit2.GIT_SORT_TIME):
+                        commits.append({
+                            'id': str(commit.id)[:7],
+                            'full_id': str(commit.id),
+                            'message': commit.message.strip(),
+                            'author': commit.author.name,
+                            'time': datetime.fromtimestamp(commit.commit_time).strftime('%Y-%m-%d %H:%M:%S'),
+                            'is_current': str(commit.id) == str(repo.head.target)
+                        })
+        except Exception as e:
+            current_branch = "Error detecting branch"
+            has_commits = False
+            print(f"Error when checking repository status: {str(e)}")
+        
+        # Get list of branches
+        branches = []
+        for branch_name in repo.branches.local:
+            branches.append(branch_name)
+        
+        # Check for modified files
+        for filepath, flags in repo.status().items():
+            status_desc = get_status_description(flags)
+            status.append({
+                'path': filepath,
+                'status': status_desc
+            })
+            
+        return render_template('gitmain.html', 
+                              project_path=project_path,
+                              current_branch=current_branch,
+                              branches=branches,
+                              commits=commits,
+                              status=status)
+    except Exception as e:
+        return render_template('error.html', error=str(e))
+    
+    
+def get_status_description(status_flags):
+    """Convert pygit2 status flags to human-readable description."""
+    if status_flags & pygit2.GIT_STATUS_INDEX_NEW:
+        return "New (staged)"
+    elif status_flags & pygit2.GIT_STATUS_INDEX_MODIFIED:
+        return "Modified (staged)"
+    elif status_flags & pygit2.GIT_STATUS_INDEX_DELETED:
+        return "Deleted (staged)"
+    elif status_flags & pygit2.GIT_STATUS_WT_NEW:
+        return "New (unstaged)"
+    elif status_flags & pygit2.GIT_STATUS_WT_MODIFIED:
+        return "Modified (unstaged)"
+    elif status_flags & pygit2.GIT_STATUS_WT_DELETED:
+        return "Deleted (unstaged)"
+    else:
+        return "Unknown"
+
+
+
+@app.route('/git_init', methods=['POST'])
+def git_init():
+    """Initialize a new Git repository."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    try:
+        subprocess.run(['git', 'init'], cwd=project_path, check=True)
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        return render_template('error.html', error=f"Git init failed: {str(e)}")
+
+@app.route('/git_stage_all', methods=['POST'])
+def git_stage_all():
+    """Stage all changes."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    try:
+        subprocess.run(['git', 'add', '.'], cwd=project_path, check=True)
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        return render_template('error.html', error=f"Staging failed: {str(e)}")
+
+@app.route('/git_commit', methods=['POST'])
+def git_commit():
+    """Commit staged changes."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    commit_message = request.form.get('commit_message', 'Update')
+    try:
+        # Stage all changes if requested
+        if request.form.get('stage_all'):
+            subprocess.run(['git', 'add', '.'], cwd=project_path, check=True,capture_output=True)
+        
+        # Perform the commit
+        subprocess.run(['git', 'commit', '-m', commit_message], cwd=project_path, check=True,capture_output=True)
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        git_error = e.stderr
+        return render_template('error.html', error=f"Commit failed: {git_error}")
+
+@app.route('/git_push', methods=['POST'])
+def git_push():
+    """Push commits to remote."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    try:
+        # Get the current branch
+        repo = pygit2.Repository(os.path.join(project_path, '.git'))
+        
+        try:
+            head_ref = repo.head
+            if hasattr(head_ref, 'shorthand'):
+                current_branch = head_ref.shorthand
+            else:
+                # Alternative method to get branch name
+                current_branch = head_ref.name.replace('refs/heads/', '')
+        except (pygit2.GitError, AttributeError):
+            return render_template('error.html', error="Cannot determine current branch. Make sure you have commits.")
+        
+        # Push to remote
+        result = subprocess.run(['git', 'push', 'origin', current_branch], 
+                               cwd=project_path, 
+                               capture_output=True, 
+                               text=True)
+        
+        if result.returncode != 0:
+            if "remote origin already exists" in result.stderr:
+                return render_template('error.html', error="Remote already exists. Try pushing again.")
+            elif "no configured push destination" in result.stderr:
+                # Remote is not set up
+                return render_template('setup_remote.html', project_path=project_path)
+            else:
+                return render_template('error.html', error=f"Push failed: {result.stderr}")
+        
+        return redirect(url_for('gitmain'))
+    except Exception as e:
+        return render_template('error.html', error=f"Push failed: {str(e)}")
+
+@app.route('/setup_remote', methods=['POST'])
+def setup_remote():
+    """Set up a remote repository."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    remote_url = request.form.get('remote_url')
+    
+    try:
+        # Check if remote already exists
+        result = subprocess.run(['git', 'remote'], cwd=project_path, capture_output=True, text=True, check=True)
+        
+        if 'origin' in result.stdout.split():
+            # Remove existing remote
+            subprocess.run(['git', 'remote', 'remove', 'origin'], cwd=project_path, check=True,capture_output=True)
+        
+        # Add new remote
+        subprocess.run(['git', 'remote', 'add', 'origin', remote_url], cwd=project_path, check=True,capture_output=True)
+        
+        # Get current branch name safely
+        repo = pygit2.Repository(os.path.join(project_path, '.git'))
+        try:
+            head_ref = repo.head
+            if hasattr(head_ref, 'shorthand'):
+                current_branch = head_ref.shorthand
+            else:
+                current_branch = head_ref.name.replace('refs/heads/', '')
+                
+            # Set upstream for current branch
+            result=subprocess.run(['git', 'push', '--set-upstream', 'origin', current_branch], 
+                          cwd=project_path, check=True,capture_output=True)
+        except (pygit2.GitError, AttributeError):
+            return render_template('error.html', error=f"Cannot determine current branch. Make sure you have commits.")
+        
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        git_error = e.stderr
+        return render_template('error.html', error=f"Remote setup failed: {git_error}")
+
+@app.route('/checkout_commit/<commit_id>', methods=['POST'])
+def checkout_commit(commit_id):
+    """Checkout to a specific commit."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    try:
+        result = subprocess.run(['git', 'checkout', commit_id], cwd=project_path, check=True,capture_output=True)
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        git_error = e.stderr
+        return render_template('error.html', error=f"Checkout failed: {git_error}")
+
+@app.route('/checkout_branch/<branch_name>', methods=['POST'])
+def checkout_branch(branch_name):
+    """Checkout to a specific branch."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    try:
+        # Capture both stdout and stderr from the git command
+        result = subprocess.run(
+            ['git', 'checkout', branch_name], 
+            cwd=project_path, 
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        # Get the actual git error message from stderr
+        git_error = e.stderr
+        return render_template('error.html', error=f"Checkout failed: {git_error}")
+
+@app.route('/create_branch', methods=['POST'])
+def create_branch():
+    """Create a new branch."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    branch_name = request.form.get('branch_name')
+    checkout = request.form.get('checkout', 'false') == 'true'
+    
+    try:
+        # Create branch
+        subprocess.run(['git', 'branch', branch_name], cwd=project_path, check=True)
+        
+        # Checkout if requested
+        if checkout:
+            subprocess.run(['git', 'checkout', branch_name], cwd=project_path, check=True)
+        
+        return redirect(url_for('gitmain'))
+    except subprocess.CalledProcessError as e:
+        return render_template('error.html', error=f"Branch creation failed: {str(e)}")
+
+@app.route('/get_git_graph')
+def get_git_graph():
+    """Get Git graph data in JSON format for visualization."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    
+    try:
+        # Check if repository has any commits first
+        repo = pygit2.Repository(os.path.join(project_path, '.git'))
+        if repo.is_empty:
+            return jsonify({
+                'nodes': [],
+                'links': []
+            })
+            
+        # Get git log with graph format
+        result = subprocess.run(
+            ['git', 'log', '--graph', '--oneline', '--decorate', '--all', '--date-order'],
+            cwd=project_path, capture_output=True, text=True, check=True
+        )
+        
+        # Parse the git log output into a structure suitable for visualization
+        graph_lines = result.stdout.strip().split('\n')
+        
+        # Convert the ASCII graph to a structured format for D3.js visualization
+        nodes = []
+        links = []
+        
+        for i, line in enumerate(graph_lines):
+            # Extract commit hash and message
+            match = re.search(r'\*\s+([0-9a-f]+)\s+(.*)', line)
+            if match:
+                commit_hash = match.group(1)
+                commit_message = match.group(2)
+                nodes.append({
+                    'id': commit_hash,
+                    'message': commit_message,
+                    'level': i
+                })
+                
+                # Try to find parent connections based on the ASCII graph
+                for j in range(i+1, min(i+5, len(graph_lines))):
+                    parent_match = re.search(r'\*\s+([0-9a-f]+)', graph_lines[j])
+                    if parent_match and '|' in graph_lines[j-1]:
+                        links.append({
+                            'source': commit_hash,
+                            'target': parent_match.group(1)
+                        })
+                        break
+        
+        return jsonify({
+            'nodes': nodes,
+            'links': links
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/file_history/<path:file_path>')
+def file_history(file_path):
+    """Show the commit history for a specific file."""
+    project_path = session.get('project_path', DEFAULT_PROJECT_DIR)
+    
+    try:
+        repo = pygit2.Repository(os.path.join(project_path, '.git'))
+        file_history = []
+        history_exists = False
+        
+        # Make sure the file path is relative to the repository
+        if file_path.startswith(project_path):
+            file_path = os.path.relpath(file_path, project_path)
+        
+        # Check if the file currently exists in the repository
+        file_exists_now = os.path.exists(os.path.join(project_path, file_path))
+        
+        # First, check if file ever existed in repository history
+        try:
+            # Try to find the file in the current HEAD
+            if not repo.is_empty:
+                try:
+                    # This will raise KeyError if the file doesn't exist in HEAD
+                    repo.revparse_single('HEAD').tree[file_path]
+                    history_exists = True
+                except KeyError:
+                    # File might have existed in the past but was deleted
+                    # We need to search through history
+                    pass
+            
+            # If not found in HEAD or we're not sure, search through all commits
+            if not history_exists and not repo.is_empty:
+                for commit in repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL | pygit2.GIT_SORT_TIME):
+                    try:
+                        # Check if file exists in this commit
+                        commit.tree[file_path]
+                        history_exists = True
+                        break
+                    except KeyError:
+                        # Check if it was modified (added/deleted) in this commit
+                        if commit.parents:
+                            diff = repo.diff(commit.parents[0], commit)
+                            for patch in diff:
+                                if (patch.delta.new_file.path == file_path or 
+                                    patch.delta.old_file.path == file_path):
+                                    history_exists = True
+                                    break
+                            if history_exists:
+                                break
+        except Exception as e:
+            print(f"Error checking file history: {str(e)}")
+        
+        # If history exists, collect the actual history
+        if history_exists:
+            # [Your existing code to collect file_history]
+            for commit in repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL | pygit2.GIT_SORT_TIME):
+                # Check if this commit modified the file
+                parent_ids = [p.id for p in commit.parents]
+                if not parent_ids:  # Initial commit
+                    try:
+                        entry = commit.tree[file_path]
+                        file_history.append({
+                            'id': str(commit.id)[:7],
+                            'full_id': str(commit.id),
+                            'message': commit.message.strip(),
+                            'author': commit.author.name,
+                            'time': datetime.fromtimestamp(commit.commit_time).strftime('%Y-%m-%d %H:%M:%S'),
+                            'type': 'added'
+                        })
+                    except KeyError:
+                        # File didn't exist in the initial commit
+                        pass
+                else:
+                    # Compare with parent to see if file was modified
+                    parent = repo[parent_ids[0]]
+                    diff = repo.diff(parent, commit)
+                    
+                    for patch in diff:
+                        if (patch.delta.new_file.path == file_path or 
+                            patch.delta.old_file.path == file_path):
+                            
+                            change_type = 'modified'
+                            if patch.delta.is_binary:
+                                content_diff = "Binary file"
+                            else:
+                                content_diff = patch.text
+                                
+                            # Determine if file was added, deleted or modified
+                            if patch.delta.status == pygit2.GIT_DELTA_ADDED:
+                                change_type = 'added'
+                            elif patch.delta.status == pygit2.GIT_DELTA_DELETED:
+                                change_type = 'deleted'
+                                
+                            file_history.append({
+                                'id': str(commit.id)[:7],
+                                'full_id': str(commit.id),
+                                'message': commit.message.strip(),
+                                'author': commit.author.name,
+                                'time': datetime.fromtimestamp(commit.commit_time).strftime('%Y-%m-%d %H:%M:%S'),
+                                'type': change_type,
+                                'diff': content_diff if not patch.delta.is_binary else None
+                            })
+                            break
+        
+        return render_template('file_history.html', 
+                              file_path=file_path,
+                              project_path=project_path, 
+                              history=file_history,
+                              history_exists=history_exists,
+                              file_exists_now=file_exists_now)
+                              
+    except Exception as e:
+        return render_template('error.html', error=str(e))
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Socket.IO event handlers
 @socketio.on('connect')

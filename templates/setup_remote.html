@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Visualizer - Setup Remote</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container setup-container">
+        <header>
+            <h1>Git Visualizer - Setup Remote</h1>
+        </header>
+
+        <div class="content">
+            <div class="setup-card">
+                <h2>Configure Remote Repository</h2>
+                <p>Your project doesn't have a remote repository configured. Please enter a remote URL to continue.</p>
+                
+                <form action="{{ url_for('setup_remote') }}" method="POST" class="setup-form">
+                    <div class="form-group">
+                        <label for="remote_url">Remote URL:</label>
+                        <input type="text" id="remote_url" name="remote_url" 
+                               placeholder="https://github.com/username/repo.git" required>
+                    </div>
+                    <div class="form-actions">
+                        <a href="{{ url_for('gitmain') }}" class="btn secondary">Cancel</a>
+                        <button type="submit" class="btn">Set Remote & Push</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

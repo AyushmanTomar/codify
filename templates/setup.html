@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codify - Setup</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="shortcut icon" href="{{url_for('static',filename='icon.png')}}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/git.css') }}">
+</head>
+
+<body>
+    <div class="container setup-container">
+        <div class="app-container">
+            <aside class="sidebar">
+                <div class="sidebar-header" style="display: flex; gap: 10px; margin-bottom: #e2e8f0;">
+                    <i class="fas fa-code logo-icon"></i>
+                    <h1>CODIFY - AI Agent</h1>
+                </div>
+                <div class="project-selector" style="padding-top: 0px; ">
+                    <div class="project-info" style="border-bottom: 1px solid #e2e8f0">
+                        <div class="section-title">PROJECT INFO</div>
+                        <strong>{{ project_path }}</strong>
+                        <div class="section-title">CURRENT BRANCH</div>
+                        <strong>{{ current_branch }}</strong>
+                    </div>
+                    <div class="abc" style="border-bottom: 1px solid #e2e8f0;min-height: 280px">
+                        <div class="section-title">BRANCHES</div>
+                        <ul class="branch-list">
+                            {% for branch in branches %}
+                            <form action="{{ url_for('checkout_branch', branch_name=branch) }}" method="POST">
+                                <button type="submit"
+                                    class="secondary-btn {% if branch == current_branch %}active-branch{% endif %}">
+                                    {{ branch }}
+                                </button>
+                            </form>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+            </aside>
+
+
+            <div class="content" style="margin-top: 100px;">
+                <div class="setup-card">
+                    {% if error %}
+                    <div class="error-message">
+                        {{ error }}
+                    </div>
+                    {% endif %}
+                    {% if project_path and git_status == "not_initialized" %}
+                    <div class="git-init-section">
+                        <h2 style="color: #64748b; font-weight: 500;">Git is not initialized in this project</h2>
+                        <form action="{{ url_for('git_init') }}" method="POST">
+                            <button type="submit" class="primary-btn" style="margin-top: 10px;">Initialize Git
+                                Repository</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+
+                function openhome() {
+                    window.location.href = '/';
+                }
+
+                const opengit = document.createElement('button');
+                opengit.textContent = 'Home';
+                opengit.style.position = 'fixed';
+                opengit.style.top = '60px';
+                opengit.style.right = '70px';
+                opengit.style.padding = '8px 16px';
+                opengit.style.backgroundColor = 'blue';
+                opengit.style.color = 'white';
+                opengit.style.border = 'none';
+                opengit.style.borderRadius = '4px';
+                opengit.style.cursor = 'pointer';
+                opengit.style.zIndex = '1000';
+
+                opengit.addEventListener('click', openhome);
+                document.body.appendChild(opengit);
+            });
+        </script>
+</body>
+
+</html>

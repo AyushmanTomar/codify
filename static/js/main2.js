@@ -999,7 +999,8 @@ document.addEventListener('DOMContentLoaded', () => {
     resolve_error.addEventListener('click', resolveerror);
 
     async function resolveerror() {
-        userPrompt.value = "desired task:\n" + userPrompt.value + "command output: " + state.command_output_f + "\n vision model output: \n" + window.summary_vision;
+        await stopAllCommands();
+        userPrompt.value = "desired task:\n" + userPrompt.value + "command output: " + state.command_output_f + "\n\n " + window.live_command_output + "\n vision model output: \n" + window.summary_vision;
         window.commandOutput = state.command_output_f;
         if (window.vison_stop_agent == 'False' || window.vison_stop_agent == false) {
             await analyzeProject();
@@ -1040,6 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshFileList();
         checkApiKeyStatus();
         window.vison_stop_agent = 'False'
+        window.live_command_output=""
     }
 
     // Start the app

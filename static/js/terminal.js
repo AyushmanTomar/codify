@@ -5,36 +5,36 @@ let activeCommands = {};
 function initializeSocket() {
     socket = io();
 
-    socket.on('command_status', function(data) {
+    socket.on('command_status', function (data) {
         const { command_id, status, returncode, is_server } = data;
         console.log("Command status update:", command_id, status);
-        
+
         // Create the terminal if it doesn't exist yet
         if (!document.getElementById(`terminal-${command_id}-container`)) {
             createTerminal(command_id, `Command: ${command_id}`, is_server);
         }
-        
+
         updateCommandStatus(command_id, status, returncode);
     });
 
-    socket.on('command_output', function(data) {
+    socket.on('command_output', function (data) {
         const { command_id, output, type } = data;
         console.log("Command output:", command_id, type);
-        
+
         // Create the terminal if it doesn't exist yet
         if (!document.getElementById(`terminal-${command_id}-container`)) {
             createTerminal(command_id, `Command: ${command_id}`, true);
         }
-        
+
         appendToTerminal(command_id, output, type);
     });
 
-    socket.on('connect_error', function(error) {
+    socket.on('connect_error', function (error) {
         console.error('Socket.IO connection error:', error);
         showNotification('Connection error: ' + error.message, 'status');
     });
 
-    socket.on('reconnect', function(attemptNumber) {
+    socket.on('reconnect', function (attemptNumber) {
         console.log('Reconnected to server after ' + attemptNumber + ' attempts');
         showNotification('Reconnected to server', 'success');
         listActiveCommands(); // Refresh on reconnect
@@ -49,7 +49,7 @@ function createTerminal(command_id, command, is_server) {
     }
 
     console.log(`Creating new terminal: ${terminalId}`);
-    
+
     const terminalHtml = `
         <div id="${terminalId}-container" class="terminal-container">
             <div class="terminal-header">
@@ -98,23 +98,24 @@ function createTerminal(command_id, command, is_server) {
 function appendToTerminal(command_id, output, type) {
     const terminalId = `terminal-${command_id}`;
     const terminal = document.getElementById(terminalId);
-    
+
     if (!terminal) {
         console.warn(`Terminal ${terminalId} not found, attempting to create it`);
         // Create the terminal if it doesn't exist
         createTerminal(command_id, `Command: ${command_id}`, true);
-        
+
         // Try to get the terminal element again
         const newTerminal = document.getElementById(terminalId);
         if (!newTerminal) {
             console.error(`Failed to create terminal ${terminalId}`);
             return;
         }
-        
+
         // Append output to the newly created terminal
         const outputElement = document.createElement('div');
         outputElement.className = `terminal-line ${type}`;
         outputElement.textContent = output;
+        window.live_command_output = window.live_command_output + output;
         newTerminal.appendChild(outputElement);
         newTerminal.scrollTop = newTerminal.scrollHeight;
     } else {
@@ -122,6 +123,7 @@ function appendToTerminal(command_id, output, type) {
         const outputElement = document.createElement('div');
         outputElement.className = `terminal-line ${type}`;
         outputElement.textContent = output;
+        window.live_command_output = window.live_command_output + output;
         terminal.appendChild(outputElement);
         terminal.scrollTop = terminal.scrollHeight;
     }
@@ -134,13 +136,13 @@ function updateCommandStatus(command_id, status, returncode) {
     if (statusDot) {
         statusDot.classList.remove('running', 'completed', 'error', 'stopped');
         statusDot.classList.add(status === 'completed' && returncode === 0 ? 'completed' :
-                               status === 'completed' && returncode !== 0 ? 'error' :
-                               status === 'stopped' ? 'stopped' : 'running');
+            status === 'completed' && returncode !== 0 ? 'error' :
+                status === 'stopped' ? 'stopped' : 'running');
 
         const statusText = status === 'completed' ?
-                          (returncode === 0 ? 'Completed successfully' : `Failed with code ${returncode}`) :
-                          status === 'stopped' ? 'Stopped' :
-                          status === 'running' ? 'Running' : status;
+            (returncode === 0 ? 'Completed successfully' : `Failed with code ${returncode}`) :
+            status === 'stopped' ? 'Stopped' :
+                status === 'running' ? 'Running' : status;
         appendToTerminal(command_id, `--- ${statusText} ---`, 'status');
 
         if (status !== 'running') {
@@ -159,12 +161,12 @@ function updateCommandStatus(command_id, status, returncode) {
 }
 
 function attachTerminalEventListeners(command_id) {
-     const terminalId = `terminal-${command_id}`;
+    const terminalId = `terminal-${command_id}`;
 
     // Clear button
     const clearBtn = document.querySelector(`button.clear-btn[data-terminal="${command_id}"]`);
     if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
+        clearBtn.addEventListener('click', function () {
             const terminal = document.getElementById(terminalId);
             if (terminal) {
                 terminal.innerHTML = '';
@@ -175,7 +177,7 @@ function attachTerminalEventListeners(command_id) {
     // Stop button
     const stopBtn = document.querySelector(`button.stop-btn[data-terminal="${command_id}"]`);
     if (stopBtn) {
-        stopBtn.addEventListener('click', function() {
+        stopBtn.addEventListener('click', function () {
             stopCommand(command_id);
         });
     }
@@ -183,7 +185,7 @@ function attachTerminalEventListeners(command_id) {
     // Input field enter key
     const inputField = document.getElementById(`${terminalId}-input`);
     if (inputField) {
-        inputField.addEventListener('keydown', function(event) {
+        inputField.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 sendCommandInput(command_id, inputField.value);
                 inputField.value = '';
@@ -194,7 +196,7 @@ function attachTerminalEventListeners(command_id) {
     // Send button
     const sendBtn = document.querySelector(`button.send-input-btn[data-terminal="${command_id}"]`);
     if (sendBtn) {
-        sendBtn.addEventListener('click', function() {
+        sendBtn.addEventListener('click', function () {
             const inputField = document.getElementById(`${terminalId}-input`);
             if (inputField) {
                 sendCommandInput(command_id, inputField.value);
@@ -204,7 +206,7 @@ function attachTerminalEventListeners(command_id) {
     }
 }
 
-function stopCommand(command_id) {
+async function stopCommand(command_id) {
     fetch('/api/stop-command', {
         method: 'POST',
         headers: {
@@ -212,31 +214,31 @@ function stopCommand(command_id) {
         },
         body: JSON.stringify({ command_id: command_id })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification(`Command stopped: ${command_id}`, 'success');
-            clearInterval(window.intervalID);
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(`Command stopped: ${command_id}`, 'success');
+                clearInterval(window.intervalID);
+                const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
+                if (terminalContainer) {
+                    terminalContainer.style.display = 'none';
+                }
+            } else {
+                showNotification(`Error: ${data.message}`, 'error');
+                const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
+                if (terminalContainer) {
+                    terminalContainer.style.display = 'none';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error stopping command:', error);
+            showNotification(`Error: ${error.message}`, 'error');
             const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
             if (terminalContainer) {
                 terminalContainer.style.display = 'none';
             }
-        } else {
-            showNotification(`Error: ${data.message}`, 'error');
-            const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
-            if (terminalContainer) {
-                terminalContainer.style.display = 'none';
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error stopping command:', error);
-        showNotification(`Error: ${error.message}`, 'error');
-        const terminalContainer = document.getElementById(`terminal-${command_id}-container`);
-        if (terminalContainer) {
-            terminalContainer.style.display = 'none';
-        }
-    });
+        });
 }
 
 function sendCommandInput(command_id, input) {
@@ -252,16 +254,16 @@ function sendCommandInput(command_id, input) {
             input: input
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            showNotification(`Error: ${data.message}`, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error sending input:', error);
-        showNotification(`Error: ${error.message}`, 'error');
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                showNotification(`Error: ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error sending input:', error);
+            showNotification(`Error: ${error.message}`, 'error');
+        });
 }
 
 function listActiveCommands() {
@@ -270,7 +272,7 @@ function listActiveCommands() {
         .then(data => {
             if (data.success) {
                 console.log("Active commands:", data.commands);
-                
+
                 data.commands.forEach(command => {
                     // Create terminal *only* if it doesn't exist
                     if (!document.getElementById(`terminal-${command.command_id}-container`)) {
@@ -280,7 +282,7 @@ function listActiveCommands() {
                     // Update status *even if it exists* (important!)
                     updateCommandStatus(command.command_id, command.status, command.returncode);
                 });
-                
+
                 const activeCount = data.commands.filter(cmd => cmd.status === 'running').length;
                 const countElement = document.getElementById('active-commands-count');
                 if (countElement) {
@@ -295,9 +297,18 @@ function listActiveCommands() {
         });
 }
 
-function stopAllCommands() {
+async function stopAllCommands() {
     const commandIds = Object.keys(activeCommands).filter(id =>
         activeCommands[id].status === 'running');
+
+
+
+    Object.keys(activeCommands).forEach(commandId => {
+        const terminalContainer = document.getElementById(`terminal-${commandId}-container`);
+        if (terminalContainer) {
+            terminalContainer.style.display = 'none';
+        }
+    })
 
     if (commandIds.length === 0) {
         showNotification('No active commands to stop', 'info');
@@ -332,8 +343,8 @@ function escapeHtml(unsafe) {
 function showNotification(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' :
-                                                               type === 'success' ? 'success' :
-                                                               type === 'warning' ? 'warning' : 'info'}`;
+        type === 'success' ? 'success' :
+            type === 'warning' ? 'warning' : 'info'}`;
     toast.setAttribute('role', 'alert');
     toast.setAttribute('aria-live', 'assertive');
     toast.setAttribute('aria-atomic', 'true');
@@ -359,13 +370,13 @@ function showNotification(message, type = 'info') {
         bsToast.show();
 
         // Remove the toast after it's hidden
-        toast.addEventListener('hidden.bs.toast', function() {
+        toast.addEventListener('hidden.bs.toast', function () {
             toastContainer.removeChild(toast);
         });
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeSocket();
     listActiveCommands(); // Call immediately on load!
 
@@ -373,14 +384,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (stopAllBtn) {
         stopAllBtn.addEventListener('click', stopAllCommands);
     }
-    
+
     const refreshBtn = document.getElementById("refresh_command");
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
+        refreshBtn.addEventListener('click', function () {
             listActiveCommands();
         });
     }
-    
+
     // Periodic refresh of active commands (optional)
     // const refreshInterval = setInterval(listActiveCommands, 10000);
 });

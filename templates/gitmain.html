@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codify - Versions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/git.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="shortcut icon" href="{{url_for('static',filename='icon.png')}}" type="image/x-icon">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header" style="display: flex; gap: 10px; margin-bottom: #e2e8f0;">
+                <i class="fas fa-code logo-icon"></i>
+                <h1>CODIFY - Versions</h1>
+            </div>
+            <div class="project-selector" style="padding-top: 0px; ">
+                <div class="project-info" style="border-bottom: 1px solid #e2e8f0">
+                    <div class="section-title" style="color: #1e293b; font-weight: 500; display: flex;">PROJECT INFO</div>
+                    {{ project_path }}
+                    <div class="section-title" style="color: #1e293b; font-weight: 500;">CURRENT BRANCH</div>
+                    {{ current_branch }}
+                </div>
+                <div class="abc" style="border-bottom: 1px solid #e2e8f0;min-height: 280px">
+                    <div class="section-title">BRANCHES</div>
+                    <ul class="branch-list">
+                        {% for branch in branches %}
+                        <form action="{{ url_for('checkout_branch', branch_name=branch) }}" method="POST">
+                            <button type="submit"
+                                class="secondary-btn {% if branch == current_branch %}active-branch{% endif %}">
+                                {{ branch }}
+                            </button>
+                        </form>
+                        {% endfor %}
+                    </ul>
+                    <form action="{{ url_for('create_branch') }}" method="POST" class="branch-form" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="section-title">CREATE NEW BRANCH</div>
+                        <input type="text" name="branch_name" placeholder="New branch name" required>
+                        <div class="checkbox-container">
+                            <input type="checkbox" name="checkout" value="true" id="checkout">
+                            <label for="checkout">Checkout after creation</label>
+                        </div>
+                        <button type="submit" class="primary-btn">Create Branch</button>
+                    </form>
+                </div>
+                <div class="abc" style=" min-height: 150px;margin-top: 20px;">
+                    <div class="section-title">GIT ACTIONS</div>
+                    <div class="actions">
+                        <form action="{{ url_for('git_stage_all') }}" method="POST">
+                            <button type="submit" class="primary-btn">Stage All Changes</button>
+                        </form>
+                        <form action="{{ url_for('git_commit') }}" method="POST" class="commit-form" style="display: flex; flex-direction: column; gap: 5px;">
+                            <input type="text" name="commit_message" placeholder="Commit message" required>
+                            <div class="checkbox-container">
+                                <input type="checkbox" name="stage_all" value="true" id="stage_all">
+                                <label for="stage_all">Stage all before commit</label>
+                            </div>
+                            <button type="submit" class="primary-btn">Commit</button>
+                        </form>
+                    </div>
+                </div>
+                <form action="{{ url_for('git_push') }}" method="POST">
+                    <button type="submit" class="primary-btn">Push to Remote</button>
+                </form>
+            </div>
+
+        </aside>
+
+
+
+        <div class="content">
+            <div class="main-content">
+                <div class="section">
+                    <h2>Git Graph</h2>
+                    <div id="git-graph" class="graph-container"></div>
+                </div>
+
+                <div class="section">
+                    <h2>Commit History</h2>
+                    <ul class="commit-list">
+                        {% for commit in commits %}
+                        <li class="commit-item {% if commit.is_current %}current{% endif %}">
+                            <div class="commit-header">
+                                <span class="commit-id">{{ commit.id }}</span>
+                                <span class="commit-author">{{ commit.author }}</span>
+                                <span class="commit-time">{{ commit.time }}</span>
+                            </div>
+                            <div class="commit-message">{{ commit.message }}</div>
+                            <div class="commit-actions">
+                                <form action="{{ url_for('checkout_commit', commit_id=commit.full_id) }}" method="POST">
+                                    <button type="submit" class="text-button">Checkout</button>
+                                </form>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <h2>Working Directory Status</h2>
+                    <ul class="status-list">
+                        {% for item in status %}
+                        <li class="status-item">
+                            <span class="status-path">{{ item.path }}</span>
+                            <span
+                                class="status-desc {{ item.status|lower|replace(' ', '-')|replace('(', '')|replace(')', '') }}">{{
+                                item.status }}</span>
+                            
+                            <a href="{{ url_for('file_history', file_path=item.path) }}" class="text-button">History</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+
+</html>

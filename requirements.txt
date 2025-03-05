@@ -7,4 +7,5 @@ pywebview
 opencv-python 
 mss 
 numpy
-pyttsx3 
+pyttsx3
+pygit2

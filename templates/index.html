@@ -357,7 +357,7 @@
 
         // Variable to track if closing has been confirmed
         let closingConfirmed = false;
-
+        console.log(closingConfirmed)
         // Listen for the beforeunload event which fires when the window/tab is about to be closed
         window.addEventListener('beforeunload', function (event) {
             // If we've already confirmed, let the tab close naturally
@@ -393,6 +393,11 @@
                     });
             }
         }
+        function openversioning(){
+            closingConfirmed=true;
+            window.location.href = '/gitmain';
+
+        }
 
         // Add a close button to the UI
         document.addEventListener('DOMContentLoaded', function () {
@@ -409,6 +414,23 @@
             closeButton.style.cursor = 'pointer';
             closeButton.style.zIndex = '1000';
 
+            
+
+            const opengit = document.createElement('button');
+            opengit.textContent = 'open version control';
+            opengit.style.position = 'fixed';
+            opengit.style.top = '30px';
+            opengit.style.right = '200px';
+            opengit.style.padding = '8px 16px';
+            opengit.style.backgroundColor = 'blue';
+            opengit.style.color = 'white';
+            opengit.style.border = 'none';
+            opengit.style.borderRadius = '4px';
+            opengit.style.cursor = 'pointer';
+            opengit.style.zIndex = '1000';
+
+            opengit.addEventListener('click', openversioning);
+            document.body.appendChild(opengit);
             closeButton.addEventListener('click', confirmCloseAndShutdown);
             document.body.appendChild(closeButton);
         });

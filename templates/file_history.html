@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codify - File History</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="shortcut icon" href="{{url_for('static',filename='icon.png')}}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Modern CSS Variables */
+        :root {
+            --primary: linear-gradient(45deg, #6366f1, #10b981);
+            --primary-hover: #4f46e5;
+            --secondary: #64748b;
+            --secondary-hover: #475569;
+            --success: #10b981;
+            --danger: #ef4444;
+            --light: #f1f5f9;
+            --dark: #1e293b;
+            --text: #334155;
+            --text-light: #94a3b8;
+            --bg: #f8fafc;
+            --border: #e2e8f0;
+            --border-radius: 0.5rem;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --transition: all 0.2s ease;
+            --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        /* Base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font);
+            line-height: 1.6;
+            color: var(--text);
+            background-color: var(--bg);
+            font-size: 16px;
+        }
+
+        .container {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Typography */
+        h2 {
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.75rem;
+            font-weight: 600;
+            font-size: 1.75rem;
+        }
+
+        h5 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        p {
+            margin: 0.5rem 0;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            padding: 0.625rem 1.25rem;
+            font-size: 0.95rem;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            color: white;
+            background-color: var(--secondary);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--secondary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-outline-secondary {
+            color: var(--secondary);
+            border: 1px solid var(--secondary);
+            background-color: transparent;
+        }
+
+        .btn-outline-secondary:hover {
+            color: white;
+            background-color: var(--secondary);
+            transform: translateY(-1px);
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+            border-radius: calc(var(--border-radius) - 0.125rem);
+        }
+
+        .mb-3 {
+            margin-bottom: 1.5rem;
+        }
+
+        .mt-2 {
+            margin-top: 0.75rem;
+        }
+
+        /* List group */
+        .list-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .list-group-item {
+            position: relative;
+            display: block;
+            padding: 1.25rem;
+            background-color: white;
+            border: 1px solid var(--border);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+
+        .list-group-item:hover {
+            box-shadow: var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25em 0.75em;
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            border-radius: 9999px;
+            margin-right: 0.75rem;
+        }
+
+        .bg-success {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .bg-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .bg-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        /* Flexbox utilities */
+        .d-flex {
+            display: flex;
+        }
+
+        .justify-content-between {
+            justify-content: space-between;
+        }
+
+        .align-items-center {
+            align-items: center;
+        }
+
+        /* Alerts */
+        .alert {
+            position: relative;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .alert-info {
+            color: #0369a1;
+            background-color: #e0f2fe;
+            border-left: 4px solid #0ea5e9;
+        }
+
+        /* Code display */
+        pre {
+            margin: 0;
+            overflow: auto;
+            max-height: 350px;
+            border-radius: var(--border-radius);
+        }
+
+        pre code {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9rem;
+            white-space: pre;
+        }
+
+        .bg-light {
+            background-color: var(--light);
+            border: 1px solid var(--border);
+        }
+
+        .p-3 {
+            padding: 1rem;
+        }
+
+        /* Collapse */
+        .collapse:not(.show) {
+            display: none;
+        }
+
+        /* Small text */
+        small {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        /* Links */
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--primary-hover);
+            text-decoration: underline;
+        }
+
+        /* Back button with icon */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-btn:before {
+            content: "←";
+            font-size: 1.1rem;
+        }
+
+        /* Commit meta info */
+        .commit-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Show changes button */
+        .changes-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .changes-btn:after {
+            content: "↓";
+            transition: var(--transition);
+        }
+
+        .changes-btn[aria-expanded="true"]:after {
+            content: "↑";
+        }
+
+        /* Code diff container */
+        .diff-container {
+            margin-top: 1rem;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar-header" style="display: flex; gap: 10px; margin-bottom: #e2e8f0; display: flex; align-items: center; justify-content: center;">
+        <i class="fas fa-code logo-icon" style="font-size: 30px;"></i>
+        <h1 style="font-size: 30px;">CODIFY - AI Agent</h1>
+    </div>
+    <div class="container">
+        <h2>History for: {{ file_path }}</h2>
+        <a href="/gitmain" class="primary-btn" style="margin-bottom: 20px;">Back to Repository</a>
+
+        {% if history %}
+        <div class="list-group">
+            {% for commit in history %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5>
+                        <span
+                            class="badge 
+                                {% if commit.type == 'added' %}bg-success{% elif commit.type == 'deleted' %}bg-danger{% else %}bg-primary{% endif %}">
+                            {{ commit.type }}
+                        </span>
+                        {{ commit.message }}
+                    </h5>
+                    <small>{{ commit.time }}</small>
+                </div>
+                
+                <div class="commit-meta">
+                    <p>Author: {{ commit.author }}</p>
+                    <small>Commit: <a href="/commit/{{ commit.full_id }}">{{ commit.id }}</a></small>
+                </div>
+
+                {% if commit.diff and commit.type != 'deleted' %}
+                <div class="mt-2">
+                    <button class="secondary-btn" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#diff-{{ commit.id }}" aria-expanded="false">
+                        Show Changes
+                    </button>
+                    <div class="collapse" id="diff-{{ commit.id }}">
+                        <div class="diff-container">
+                            <pre class="bg-light p-3"><code>{{ commit.diff }}</code></pre>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">No history found for this file.</div>
+        {% endif %}
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Find all collapse toggle buttons
+            const toggleButtons = document.querySelectorAll('[data-bs-toggle="collapse"]');
+
+            // Add click event listener to each button
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    // Get the target element ID from the data-bs-target attribute
+                    const targetId = this.getAttribute('data-bs-target');
+                    const targetElement = document.querySelector(targetId);
+
+                    if (!targetElement) return;
+
+                    // Toggle the collapse state
+                    if (targetElement.classList.contains('show')) {
+                        targetElement.classList.remove('show');
+                        this.setAttribute('aria-expanded', 'false');
+                        this.textContent = 'Show Changes';
+                    } else {
+                        targetElement.classList.add('show');
+                        this.setAttribute('aria-expanded', 'true');
+                        this.textContent = 'Hide Changes';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
