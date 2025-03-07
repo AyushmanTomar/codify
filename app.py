@@ -49,7 +49,7 @@ def initialize_gemini():
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             analyzer = ScreenAnalyzer(GEMINI_API_KEY)
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai.GenerativeModel('gemini-2.0-flash') #gemini-2.0-flash-lite
             logger.info("Gemini API configured successfully")
         except Exception as e:
             logger.error(f"Error configuring Gemini API: {e}")
@@ -58,10 +58,73 @@ def initialize_gemini():
         logger.warning("No Gemini API key found in environment variables")
         model = None
 
+# Define routes
+@app.route('/autocomplete', methods=['POST'])
+def autocomplete():
+    global model
+    model = genai.GenerativeModel('gemini-2.0-flash-lite')
+    data = request.get_json()
+    exist_code = data['code']
+
+    prompt = f"""You are an AI code completion assistant. Given a code snippet, your task is to predict the most likely and complete continuation of the code. Aim to provide a substantial code block, such as a function definition or a logical code segment, that seamlessly integrates with the existing code.
+
+    Programming Language: Detect by seeing the existing code
+
+    Existing Code:
+    ```
+    {exist_code}
+    ```
+
+    Instructions:
+
+    1.  **Provide Substantial Code Completion:**  Instead of just completing the current line, generate a meaningful block of code that expands upon the existing code. This could be a function, a class, a loop, or a conditional block – whatever logically fits the context.
+    2.  **Understand Context:** Deeply analyze the existing code to understand its purpose, data structures, variables, and intended functionality.
+    3.  **Seamless Integration:** The generated code MUST be syntactically correct, logically consistent, and seamlessly integrated with the existing code.  It should feel like a natural extension written by the same developer.
+    4.  **Completeness:** Ensure all code blocks (functions, loops, conditionals) are properly opened and closed.
+    5.  **Correctness:**  Prioritize correctness. The generated code should compile or run without errors, where applicable.
+    6.  **Adhere to Language Conventions:** Strictly adhere to the syntax and coding style conventions of the specified programming language.
+    7.  **Avoid Repetition:** Do not simply repeat existing code. Focus on *extending* the code in a useful and predictable way.
+    8.  **No Extraneous Text:**  Return only the generated code, without any introductory or explanatory text.
+
+    Output Format:
+
+    *   Return *only* the suggested code completion. Do not include any surrounding text, code block delimiters, or explanations.
+    *   Use "\\n" for newlines. Maintain correct indentation and syntax for the given language.
+    *   Use "\\t" for python formating
+
+    Example:
+
+    Existing Code:
+    ```
+    function calculateArea(width, height) {{
+      return width * height;
+    }}
+
+    function calculateCircumference(radius) {{
+      return 2 * Math.PI *
+    ```
+
+    Output:
+    ```
+    radius;\\n}}
+    ```
+
+    Now, generate the code completion for the given existing code in detected language.
+    """
+
+    generation_config = {"max_output_tokens": 8000}
+    response = model.generate_content(prompt, generation_config=generation_config)
+    model = genai.GenerativeModel('gemini-2.0-flash')
+
+    return jsonify({"completion": response.text.strip()})
+    
+
+
 
 # Define routes
 @app.route('/start_stream', methods=['POST'])
 def start_stream():
+
     data = request.get_json()
     if not data or 'prompt' not in data:
         return jsonify({'error': 'Missing prompt in request'}), 400

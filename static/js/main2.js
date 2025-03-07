@@ -363,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editorPlaceholder.classList.remove('hidden');
         editorContent.classList.add('hidden');
         fileEditor.value = ''; // Clear the editor content
+        codeMirrorEditor.setValue(fileEditor.value)
 
         // Clear any active selection in the file list
         document.querySelectorAll('.file-item.selected').forEach(item => {
@@ -384,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update file editor content - ensure it's not undefined
         fileEditor.value = state.openFiles[filePath] || '';
-
+        codeMirrorEditor.setValue(fileEditor.value);
         // Show editor content, hide placeholder
         editorPlaceholder.classList.add('hidden');
         editorContent.classList.remove('hidden');
@@ -412,10 +413,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function openFile(filePath) {
         try {
             // Check if file is already open
-            if (state.openFiles[filePath]) {
+            if (state.openFiles[filePath] || state.openFiles[filePath]=='') {
                 switchToFile(filePath);
                 return;
             }
+            console.log(state.openFiles);
+            console.log(filePath)
 
             showLoading(`Loading ${filePath}...`);
             const data = await apiRequest('read-file', 'POST', { path: filePath });
@@ -431,6 +434,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Switch to the file
             switchToFile(filePath);
+
+            codeMirrorEditor.setValue(fileContent);
 
             showNotification(`File ${filePath} opened`, 'success');
         } catch (error) {
@@ -450,8 +455,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('No file is currently open', 'error');
             return;
         }
-
-        const content = fileEditor.value;
+        const cont = codeMirrorEditor.getValue();
+        const content = cont;
 
         try {
             showLoading(`Saving ${state.activeFile}...`);
@@ -788,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update editor content if this is the active file
                 if (state.activeFile === filePath) {
                     fileEditor.value = newContent;
+                    codeMirrorEditor.setValue(newContent);
                 }
             } else {
                 openFile(filePath)
@@ -856,6 +862,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update editor content if this is the active file
                     if (state.activeFile === filePath) {
                         fileEditor.value = newContent;
+                        codeMirrorEditor.setValue(fileEditor.value)
+
                     }
                 } else {
                     openFile(filePath)

@@ -144,5 +144,6 @@
 
 /* Remove default terminal message when terminals exist */
 #terminals-container:not(:empty) #no-terminals-message {
+    margin-top: 20px;
     display: none;
 }

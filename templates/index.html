@@ -13,6 +13,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
     <style>
         .collapsible-content {
@@ -150,7 +152,7 @@
 
         /* Basic styling for the container */
         #terminals-container {
-            margin-top: 20px;
+            
             /* Add some space above the terminals */
             /* Add any other styling you want for the container */
         }
@@ -163,6 +165,18 @@
         .btn-sm {
             padding: 2px 4px;
             font-size: 10px;
+        }
+
+        .CodeMirror {
+            height: 100% !important;
+        }
+
+        .cm-completion-hint {
+            color: #888;
+            background-color: transparent;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0.6;
         }
     </style>
 </head>
@@ -229,7 +243,9 @@
                         </button>
                     </div>
                     <div class="" style="display: flex; gap: 10px; ">
-                        <div id="statusMessage" style="padding: 10px 16px; background-color:#e2e8f068; border-radius: 10px; font-size: 15px;">Stream Status</div>
+                        <div id="statusMessage"
+                            style="padding: 10px 16px; background-color:#e2e8f068; border-radius: 10px; font-size: 15px;">
+                            Stream Status</div>
                         <button id="startBtn" class="secondary-btn">Stream Screen</button>
                         <button id="stopBtn" class="secondary-btn">Stop</button>
                     </div>
@@ -246,16 +262,27 @@
             </div>
 
             <div class="editor-analysis-container" style="width: 100%; height: 100%; display: flex;">
-                <div class="editor-section" style="min-width: 50%; height: 100%;">
+                <div id="editor_section" class="editor-section" style="min-width: 50%; height: 100%;">
                     <div id="file-tabs" class="file-tabs"></div>
                     <div class="editor-wrapper" id="editor-container" style="height: 100%;">
                         <div id="editor-placeholder" class="editor-placeholder">
                             <i class="fas fa-code fa-3x"></i>
                             <p>Select a file to edit or analyze your project</p>
                         </div>
-                        <div id="editor-content" class="hidden" style="height: 80%">
+                        <div id="editor-content" class="hidden">
                             <textarea id="file-editor" style="height: 100%;"></textarea>
                             <div class="editor-actions">
+                                <select id="items" onchange="saveValue()" style="margin-right: 10px;"
+                                    class="secondary-btn">
+                                    <option value="python" selected>Python</option>
+                                    <option value="javascript">Java</option>
+                                    <option value="javascript">C/C++</option>
+                                    <option value="htmlmixed">HTML</option>
+                                </select>
+                                <button id="autocomplete" class="secondary-btn" style="margin-right: 10px;">Auto
+                                    Complete</button>
+                                <button id="full_screen_button" class="secondary-btn" style="margin-right: 10px;">Full
+                                    Screen</button>
                                 <button id="save-file-btn" class="secondary-btn">
                                     <i class="fas fa-save"></i> Save Changes
                                 </button>
@@ -276,7 +303,8 @@
                     <div class="analysis-content">
                         <div class="analysis-summary-container">
                             <h3 class="section-title">Summary</h3>
-                            <div id="analysis-summary-stream" class="analysis-summary" style="margin-bottom: 10px;"></div>
+                            <div id="analysis-summary-stream" class="analysis-summary" style="margin-bottom: 10px;">
+                            </div>
                             <div id="analysis-summary" class="analysis-summary" style="margin-bottom: 10px;"></div>
                         </div>
                         <div class="suggested-changes-container">
@@ -304,7 +332,13 @@
                     </div>
                 </div>
             </div>
-            <div class="toast-container"></div>
+            <div class="" id="bottom" style="padding-top: 20px;"></div>
+            <a href="#bottom" id="bott">
+                <div class="secondary-btn"
+                    style="border-radius: 50%; width: fit-content; height: fit-content; font-size: 20px; position: absolute; bottom: 20px; z-index: 999; left: 50%;">
+                    <i class="fa-solid fa-caret-down"></i>
+                </div>
+            </a>
         </main>
     </div>
 
@@ -316,10 +350,52 @@
     <script src="{{ url_for('static', filename='js/main2.js') }}"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
+    <script>
+        const codeMirrorEditor = CodeMirror.fromTextArea(document.getElementById('file-editor'), {
+            lineNumbers: true,
+            theme: 'default',
+            mode: 'javascript',
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            tabSize: 4,
+            extraKeys: {
+                'Tab': 'indentMore',
+                'Shift-Tab': 'indentLess'
+            }
+        });
+
+        // Language mode selection (example)
+        function setEditorMode(mode) {
+            textArea = document.getElementById('file-editor')
+            codeMirrorEditor.setOption('mode', mode);
+            codeMirrorEditor.setValue(textArea.value);
+        }
+    </script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('super-agent').addEventListener('click', function () {
                 document.getElementById('super-agent').classList.toggle('active')
+            })
+            document.getElementById('autocomplete').addEventListener('click', function () {
+                document.getElementById('autocomplete').classList.toggle('active')
+            })
+            document.getElementById('full_screen_button').addEventListener('click', function () {
+                document.getElementById('editor_section').classList.toggle('fullscreen')
+                if (document.getElementById('editor-content').style.height == '90%') {
+                    document.getElementById('editor-content').style.height = '80%';
+                    document.getElementById('full_screen_button').textContent = 'Full Screen'
+
+                }
+                else {
+                    document.getElementById('editor-content').style.height = '90%'
+                    document.getElementById('full_screen_button').textContent = 'Minimize Screen'
+                }
             })
             var coll = document.getElementsByClassName("collapsible-button");
             for (var i = 0; i < coll.length; i++) {
@@ -335,7 +411,12 @@
             }
         });
 
-
+        function saveValue() {
+            var selectElement = document.getElementById("items");
+            var selectedValue = selectElement.value;
+            console.log(selectedValue)
+            setEditorMode(selectedValue);
+        }
 
         // Function to call the shutdown endpoint
         function shutdownServer() {
@@ -393,8 +474,8 @@
                     });
             }
         }
-        function openversioning(){
-            closingConfirmed=true;
+        function openversioning() {
+            closingConfirmed = true;
             window.location.href = '/gitmain';
 
         }
@@ -414,7 +495,7 @@
             closeButton.style.cursor = 'pointer';
             closeButton.style.zIndex = '1000';
 
-            
+
 
             const opengit = document.createElement('button');
             opengit.textContent = 'open version control';
@@ -445,6 +526,7 @@
         });
     </script>
     <script src="{{ url_for('static', filename='js/stream.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
 </body>
 
 </html>
