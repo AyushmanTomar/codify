@@ -38,7 +38,7 @@ model = None
 active_processes = {}  # Store running processes
 command_stop_events = {}  # Events to signal stopping a command
 analyzer = None
-
+chat = None
 
 def initialize_gemini():
     """Initialize Gemini API with API key from environment variables"""
@@ -49,7 +49,7 @@ def initialize_gemini():
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             analyzer = ScreenAnalyzer(GEMINI_API_KEY)
-            model = genai.GenerativeModel('gemini-2.0-flash') #gemini-2.0-flash-lite
+            model = genai.GenerativeModel('gemini-2.5-pro-exp-03-25') #gemini-2.0-flash-lite
             logger.info("Gemini API configured successfully")
         except Exception as e:
             logger.error(f"Error configuring Gemini API: {e}")
@@ -114,7 +114,7 @@ def autocomplete():
 
     generation_config = {"max_output_tokens": 8000}
     response = model.generate_content(prompt, generation_config=generation_config)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-2.5-pro-exp-03-25')
 
     return jsonify({"completion": response.text.strip()})
     
@@ -1010,6 +1010,102 @@ def send_input():
         }), 500
 
 
+def initialize_gemini_chat_for_chatting():
+    """Initialize a new chat session with Gemini."""
+    global chat
+    
+    # Configure the model parameters
+    generation_config = {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 65536,
+    }
+    
+    # Initialize the model
+    model_chat = genai.GenerativeModel(
+        model_name="gemini-2.5-pro-exp-03-25",
+        generation_config=generation_config
+    )
+    
+    # Start a chat session
+    chat = model_chat.start_chat(history=[])
+    
+    return chat
+
+
+def get_gemini_response(message):
+    """Get response from Gemini API."""
+    global chat
+
+    prompt="You are Codify agent user is talking to you live, below is his attached message.\nreply briefly as if you are talking to him live. Do not format your response,only return brief response that is very appropriate for speaking.\n\n User Query:"+message
+    
+    if chat is None:
+        initialize_gemini_chat_for_chatting()
+    
+    try:
+        response = chat.send_message(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error communicating with Gemini: {str(e)}"
+
+
+# Add a global variable to track the current thread
+global_thread = None
+
+@app.route('/api/talk_live', methods=['POST'])
+def chat_endpoint():
+    global global_thread
+    
+    data = request.json
+    user_message = data.get('message', '')
+    
+    if not user_message:
+        return jsonify({'response': 'No message received'})
+    
+    # Process in a separate thread to avoid blocking
+    def process_request():
+        response = get_gemini_response(user_message)
+        # In a real-time system, you might send this via WebSockets
+        # For simplicity, we'll just return it in the HTTP response
+    
+    # If there's already a thread running, wait for it to complete
+    if global_thread and global_thread.is_alive():
+        global_thread.join(timeout=1.0)  # Wait for up to 1 second
+    
+    # Start a new thread
+    global_thread = threading.Thread(target=process_request)
+    global_thread.start()
+    
+    # For immediate response
+    response = get_gemini_response(user_message)
+    speak_single_message(response)
+
+    return jsonify({'response': response})
+
+
+
+@app.route('/api/reset_talking', methods=['POST'])
+def reset_chat():
+    global chat, global_thread
+    
+    # Stop the thread if it's running
+    if global_thread and global_thread.is_alive():
+        # In Python, you can't forcibly terminate a thread safely
+        # Best practice is to use a flag or event to signal the thread to stop
+        # For simplicity here, we'll just wait for it to complete
+        global_thread.join(timeout=2.0)  # Wait up to 2 seconds for thread to finish
+    
+    # Reset the global thread variable
+    global_thread = None
+    
+    # Reset the chat
+    chat = None
+    initialize_gemini_chat_for_chatting()
+    
+    return jsonify({'status': 'Chat session reset'})
+
+
 @app.route('/api/analyze', methods=['POST'])
 def analyze_project():
     """Analyze project files and suggest changes based on user prompt"""
@@ -1111,7 +1207,7 @@ def analyze_project():
     try:
         # Call Gemini API
         generation_config = {
-            "max_output_tokens": 100000,
+            "max_output_tokens": 65536,
             "response_mime_type":"application/json"
         }
         response = model.generate_content(analysis_prompt, generation_config=generation_config)

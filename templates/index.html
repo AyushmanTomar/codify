@@ -152,7 +152,7 @@
 
         /* Basic styling for the container */
         #terminals-container {
-            
+
             /* Add some space above the terminals */
             /* Add any other styling you want for the container */
         }
@@ -177,6 +177,53 @@
             position: absolute;
             pointer-events: none;
             opacity: 0.6;
+        }
+
+        .status {
+            font-size: 16px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .listening {
+            color: #2ecc71;
+        }
+
+        .not-listening {
+            color: #e74c3c;
+        }
+
+        .mic-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #e74c3c;
+            display: inline-block;
+            margin-right: 5px;
+            vertical-align: middle;
+            transition: background-color 0.3s;
+        }
+
+        .mic-active {
+            background-color: #2ecc71;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
     </style>
 </head>
@@ -241,12 +288,14 @@
                         <button id="run-command-btn" class="secondary-btn">
                             <i class="fas fa-terminal"></i> Run Command
                         </button>
+                        <button id="start_talking" class="secondary-btn"><span class="mic-indicator"
+                                id="micIndicator"></span>Start Talking</button>
                     </div>
                     <div class="" style="display: flex; gap: 10px; ">
                         <div id="statusMessage"
                             style="padding: 10px 16px; background-color:#e2e8f068; border-radius: 10px; font-size: 15px;">
                             Stream Status</div>
-                        <button id="startBtn" class="secondary-btn">Stream Screen</button>
+                        <!-- <button id="startBtn" class="secondary-btn">Stream Screen</button> -->
                         <button id="stopBtn" class="secondary-btn">Stop</button>
                     </div>
                 </div>
@@ -333,6 +382,14 @@
                 </div>
             </div>
             <div class="" id="bottom" style="padding-top: 20px;"></div>
+            <div>
+
+                <span id="statusText" class="status not-listening">Microphone is inactive</span>
+            </div>
+            <div id="transcript">Your speech will appear here...</div>
+            <div class="controls">
+                <button id="stop_talking" disabled class="secondary-btn">Stop Talking</button>
+            </div>
             <a href="#bottom" id="bott">
                 <div class="secondary-btn"
                     style="border-radius: 50%; width: fit-content; height: fit-content; font-size: 20px; position: absolute; bottom: 20px; z-index: 999; left: 50%;">
@@ -524,6 +581,189 @@
                 confirmCloseAndShutdown();
             }
         });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const start_talking = document.getElementById('start_talking');
+            const stop_talking = document.getElementById('stop_talking');
+            const transcript = document.getElementById('transcript');
+            const statusText = document.getElementById('statusText');
+            const micIndicator = document.getElementById('micIndicator');
+
+            let recognition;
+            let isListening = false;
+            let speechTimeout;
+            let isSpeaking = false;
+            let lastTranscript = '';
+
+            // Check if browser supports Speech Recognition
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Your browser does not support Speech Recognition. Please use Chrome, Edge, or Safari.');
+                start_talking.disabled = true;
+                addBotMessage('Speech recognition not supported in this browser.');
+                return;
+            }
+
+            // Initialize Speech Recognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            // Set up events for Speech Recognition
+            recognition.onstart = () => {
+                isListening = true;
+                updateStatus(true);
+                start_talking.disabled = true;
+                stop_talking.disabled = false;
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    // Restart if we're still supposed to be listening
+                    recognition.start();
+                } else {
+                    updateStatus(false);
+                    start_talking.disabled = false;
+                    stop_talking.disabled = true;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error === 'no-speech') {
+                    // This is normal, just restart
+                    if (isListening) {
+                        recognition.stop();
+                        setTimeout(() => {
+                            if (isListening) recognition.start();
+                        }, 500);
+                    }
+                } else {
+                    alert(`Error occurred in recognition: ${event.error}`);
+                }
+            };
+
+            let finalTranscript = '';
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        finalTranscript = result[0].transcript;
+                    } else {
+                        interimTranscript += result[0].transcript;
+                    }
+                }
+
+                if (interimTranscript || finalTranscript) {
+                    // User is speaking
+                    if (!isSpeaking) {
+                        isSpeaking = true;
+                        updateMicIndicator(true);
+                    }
+
+                    // Reset the speech timeout
+                    clearTimeout(speechTimeout);
+
+                    // Set timeout to detect when user stops speaking
+                    speechTimeout = setTimeout(() => {
+                        isSpeaking = false;
+                        updateMicIndicator(false);
+
+                        // Check if we have a new transcript to send
+                        if (finalTranscript && finalTranscript !== lastTranscript) {
+                            lastTranscript = finalTranscript;
+                            addUserMessage(finalTranscript);
+                            sendToGemini(finalTranscript);
+                        }
+                    }, 1500); // 1.5 seconds of silence indicates the user stopped speaking
+                }
+            };
+
+            // Button event listeners
+            start_talking.addEventListener('click', () => {
+                isListening = true;
+                finalTranscript = '';
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.error('Recognition start error:', error);
+                    recognition.stop();
+                    setTimeout(() => recognition.start(), 200);
+                }
+            });
+
+            stop_talking.addEventListener('click', () => {
+                isListening = false;
+                recognition.stop();
+            });
+
+            // Helper functions
+            function updateStatus(listening) {
+                if (listening) {
+                    statusText.textContent = 'Microphone is active';
+                    statusText.className = 'status listening';
+                } else {
+                    statusText.textContent = 'Microphone is inactive';
+                    statusText.className = 'status not-listening';
+                    updateMicIndicator(false);
+                }
+            }
+
+            function updateMicIndicator(active) {
+                if (active) {
+                    micIndicator.classList.add('mic-active');
+                } else {
+                    micIndicator.classList.remove('mic-active');
+                }
+            }
+        });
+        stop_talking.addEventListener('click', () => {
+            fetch('/api/reset_talking', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Chat reset. Hello again!');
+                    lastTranscript = '';
+                })
+                .catch(error => {
+                    console.error('Error resetting chat:', error);
+                    console.log('Error resetting chat. Please try again.');
+                });
+        });
+
+        function addUserMessage(text) {
+            transcript.textContent = text;
+        }
+
+        function sendToGemini(message) {
+            fetch('/api/talk_live', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    // Add the actual response
+                    console.log(data.response);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    console.log('Sorry, I encountered an error processing your request.');
+                });
+        }
     </script>
     <script src="{{ url_for('static', filename='js/stream.js') }}"></script>
     <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
