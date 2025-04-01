@@ -77,6 +77,7 @@ class ScreenAnalyzer:
 
     def start_stream(self, prompt):
         """Start screen capture and analysis streams."""
+        print("in screen analyzer funton to start streem")
         current_time = time.time()
 
         if current_time - self.last_stop_time < self.cooldown_period:

@@ -1,4 +1,4 @@
-const startBtn = document.getElementById('startBtn');
+// const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
 // const promptInput = document.getElementById('prompt');
 // const streamImage = document.getElementById('streamImage');
@@ -16,7 +16,7 @@ let responseInterval = null;
 function updateUIState(streaming) {
     isStreaming = streaming;
 
-    startBtn.disabled = streaming;
+    // startBtn.disabled = streaming;
     stopBtn.disabled = !streaming;
     // promptInput.disabled = streaming;
 
@@ -49,7 +49,7 @@ function startStream2() {
     // }
 
     // Disable UI during request
-    startBtn.disabled = true;
+    // startBtn.disabled = true;
     // statusMessage.textContent = 'Starting stream...';
 
     fetch('/start_stream', {
@@ -114,6 +114,7 @@ function fetchResponse2() {
 
 
 function startStream() {
+    console.log("inside start stream function")
 
 
     const initialQuery = window.initialQuery || "";
@@ -126,7 +127,7 @@ function startStream() {
     // }
 
     // Disable UI during request
-    startBtn.disabled = true;
+    // startBtn.disabled = true;
     // statusMessage.textContent = 'Starting stream...';
 
     fetch('/start_stream', {
@@ -151,6 +152,7 @@ function startStream() {
                 // Handle error
                 statusMessage.textContent = data.message;
                 startBtn.disabled = false;
+                console.log("error stream not started")
             }
         })
         .catch(error => {
@@ -254,7 +256,7 @@ function speakTextFromDiv(divId) {
     });
 }
 // Event listeners
-startBtn.addEventListener('click', startStream2);
+// startBtn.addEventListener('click', startStream2);
 stopBtn.addEventListener('click', stopStream);
 
 // Handle stream image errors

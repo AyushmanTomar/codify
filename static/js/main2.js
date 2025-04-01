@@ -507,11 +507,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 // console.log("app.py return ",data.data);
                 // Display analysis results
                 renderAnalysisResults(data.data);
+                console.log(data.data)
+                console.log(state.superagent)
                 if (state.superagent == true) {
                     window.initialQuery = state.initial_query; // Make this accessible globally
                     window.commandOutput = state.command_output_f;
+                    console.log(isStreaming)
                     if (isStreaming == false) {
+                        console.log("stream function calling below")
                         startStream()
+                        console.log("Stream function called after")
                     }
                     else {
                         window.vison_stop_agent == "False"
@@ -558,7 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.vison_stop_agent == 'False'
                     }
                     await applyAllChanges()
-                    await comm
                     await runAllPendingCommands()
                     setTimeout(function () {
                         if ((data.data.need_intervention == 'False' || data.data.need_intervention == false) && (window.vison_stop_agent == false || window.vison_stop_agent == 'False')) {

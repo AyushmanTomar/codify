@@ -209,6 +209,121 @@
             animation: pulse 1.5s infinite;
         }
 
+        .ai-thinking-box {
+            margin-top: 20px;
+            /* --- Configuration --- */
+            --box-bg-start: rgba(0, 0, 0, 0.1);
+            ;
+            --box-bg: rgba(0, 0, 0, 0.1);
+            ;
+            /* White/Slightly off-white */
+            --box-bg-end: rgba(0, 0, 0, 0.1);
+            ;
+            /* Subtle gradient end */
+            --text-color: #ffffff;
+            /* Darker gray for text */
+            --border-color: #dcdcdc5e;
+            /* Lighter border */
+            --fade-height: 40px;
+            /* Increased fade height */
+            --animation-speed: 5s;
+            /* FASTER animation speed */
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            /* --- Box Styling --- */
+            width: 35%;
+            /* Adjusted width */
+            height: 280px;
+            /* Adjusted height */
+            min-width: 250px;
+            /* Minimum resizable width */
+            min-height: 180px;
+            /* Minimum resizable height */
+            background: linear-gradient(180deg, var(--box-bg-start), var(--box-bg-end));
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            /* More rounded corners */
+            padding: 5px 20px 5px 20px;
+            /* Reduced top/bottom padding, keep side */
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            /* Adjusted shadow */
+            overflow: hidden;
+            /* Crucial: Hides overflowing text */
+            position: relative;
+            /* Needed for pseudo-elements and text positioning */
+            /* resize: both; */
+            /* Allows user resizing */
+            /* box-sizing: border-box; */
+            /* Include padding/border in size */
+        }
+
+        /* Fade effect at the top */
+        .ai-thinking-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--fade-height);
+            /* Gradient from solid box background to transparent */
+            background: linear-gradient(to bottom, var(--box-bg) 60%, transparent);
+            z-index: 2;
+            pointer-events: none;
+            border-top-left-radius: 12px;
+            /* Match parent radius */
+            border-top-right-radius: 12px;
+        }
+
+        /* Fade effect at the bottom */
+        .ai-thinking-box::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--fade-height);
+            /* Gradient from transparent to solid box background */
+            background: linear-gradient(to top, var(--box-bg) 60%, transparent);
+            z-index: 2;
+            pointer-events: none;
+            border-bottom-left-radius: 12px;
+            /* Match parent radius */
+            border-bottom-right-radius: 12px;
+        }
+
+
+
+        .scrolling-text-content {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: var(--text-color);
+            width: 100%;
+            font-family: 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.85rem;
+            /* Slightly smaller font like image */
+            line-height: 1.6;
+            /* Adjusted line spacing */
+            /* white-space: pre-wrap; */
+            /* Preserve whitespace/breaks, allow wrapping if needed */
+            z-index: 1;
+            animation: scrollUp var(--animation-speed) linear infinite;
+        }
+
+        @keyframes scrollUp {
+            0% {
+                transform: translateY(0%);
+            }
+
+            100% {
+                /* Move text up by exactly half its height */
+                transform: translateY(-50%);
+            }
+        }
+
         @keyframes pulse {
             0% {
                 transform: scale(1);
@@ -402,6 +517,50 @@
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="loading-spinner"></div>
         <p id="loading-message">Processing your request...</p>
+        <div class="ai-thinking-box">
+            <div class="scrolling-text-content" style="text-align: center;">
+                <!-- Text Block 1 (Repeat this exactly below) -->
+                Initializing cognitive matrix... <br>
+                Parsing semantic layers... <br>
+                Engaging neural network pathways... <br>
+                Compiling contextual data streams... <br>
+                Evaluating probability vectors... <br>
+                Synthesizing abstract concepts... <br>
+                [INFO] Core logic module active. <br>
+                [DEBUG] Memory allocation: 8.12 GB used. <br>
+                [TRACE] Query received: Generate response pattern. <br>
+                Reticulating splines... <br>
+                Cross-referencing knowledge graph... <br>
+                Applying heuristics... <br>
+                [WARN] Confidence threshold approaching: 85% <br>
+                Refining output parameters... <br>
+                Generating linguistic structure... <br>
+                Performing coherence check... <br>
+                Finalizing response formulation... <br>
+                Standby for output... <br>
+                ------------------------------------ <br>
+                Initializing cognitive matrix... <br>
+                Parsing semantic layers... <br>
+                Engaging neural network pathways... <br>
+                Compiling contextual data streams... <br>
+                Evaluating probability vectors... <br>
+                Synthesizing abstract concepts... <br>
+                [INFO] Core logic module active. <br>
+                [DEBUG] Memory allocation: 8.12 GB used. <br>
+                [TRACE] Query received: Generate response pattern. <br>
+                Reticulating splines... <br>
+                Cross-referencing knowledge graph... <br>
+                Applying heuristics... <br>
+                [WARN] Confidence threshold approaching: 85% <br>
+                Refining output parameters... <br>
+                Generating linguistic structure... <br>
+                Performing coherence check... <br>
+                Finalizing response formulation... <br>
+                Standby for output... <br>
+                ------------------------------------ <br>
+                <!-- End of Text Block Duplication -->
+            </div>
+        </div>
     </div>
     <script src="{{ url_for('static', filename='js/terminal.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main2.js') }}"></script>

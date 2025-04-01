@@ -124,7 +124,7 @@ def autocomplete():
 # Define routes
 @app.route('/start_stream', methods=['POST'])
 def start_stream():
-
+    print("in start stream function")
     data = request.get_json()
     if not data or 'prompt' not in data:
         return jsonify({'error': 'Missing prompt in request'}), 400
@@ -1181,6 +1181,8 @@ def analyze_project():
     8. Do not the return file in change key if that file do not require modification.(return files that need modifications)
     9. Do not concider "Exit code: undefined" to be error.
     10. If vision model summary is given also concider it (when solving error)
+    11. If user want to create files like- docx, pptx, json, excel, etc remember you have complete access to users terminal (where you can run commands) and file paths. Give python script to create the desired file and incorporate the desired content user asked in the file and create the file. Remember while creating documents do not include elements like fonts that can cause error due to missing fonts in some system try to use elements available universally for minimum errors (This instruction is just for file creation of format like docx, pptx, excel, etc)
+
 
     Strictly Format your response as valid JSON with these keys:
     {{
