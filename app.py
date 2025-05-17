@@ -31,7 +31,10 @@ app.secret_key = "4f3c5e5c6a4b2f9a6d8e7f1a3c5b4d9f"
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 # Default project directory
-DEFAULT_PROJECT_DIR = os.getenv("DEFAULT_PROJECT_DIR", os.path.join(os.path.expanduser("~"), "projects"))
+DEFAULT_PROJECT_DIR = os.getenv("DEFAULT_PROJECT_DIR", os.path.join(os.path.expanduser("~"), "codify"))
+
+# Ensure the directory exists
+os.makedirs(DEFAULT_PROJECT_DIR, exist_ok=True)
 
 # Global variables
 model = None
@@ -1182,6 +1185,7 @@ def analyze_project():
     9. Do not concider "Exit code: undefined" to be error.
     10. If vision model summary is given also concider it (when solving error)
     11. If user want to create files like- docx, pptx, json, excel, etc remember you have complete access to users terminal (where you can run commands) and file paths. Give python script to create the desired file and incorporate the desired content user asked in the file and create the file. Remember while creating documents do not include elements like fonts that can cause error due to missing fonts in some system try to use elements available universally for minimum errors (This instruction is just for file creation of format like docx, pptx, excel, etc)
+    12. No need to give commands for directory creation for new file. by returning correct path of file directory is created automatically at right location.
 
 
     Strictly Format your response as valid JSON with these keys:
